@@ -53,11 +53,10 @@ function parseDeckList(text: string): ParsedCard[] {
   }
 
   // Parse helper function
-  const parseCardLine = (line: string): { name: string; quantity: number } | null => {
+  const parseCardLine = (line: string): { name: string; quantity: number; isCommander?: boolean } | null => {
     const trimmed = line.trim();
 
     // Handle section headers (skip them)
-    const lowerLine = trimmed.toLowerCase();
     const isHeader = trimmed.startsWith('//') ||
                      trimmed.startsWith('#') ||
                      /^[A-Z]+:$/.test(trimmed) ||
@@ -67,17 +66,26 @@ function parseDeckList(text: string): ParsedCard[] {
       return null;
     }
 
-    // Parse card line: "1 Sol Ring", "1x Sol Ring"
+    // Check for commander tags: *CMDR*, *Commander*, #!Commander
+    const isCommander = /\*CMDR\*|\*Commander\*|#!Commander/i.test(trimmed);
+
+    // Parse card line: "1 Sol Ring", "1x Sol Ring", "1 Sol Ring *CMDR*"
     const match = trimmed.match(/^(\d+)x?\s+(.+?)(?:\s+\([^)]+\).*)?$/i);
 
     if (match) {
       const quantity = parseInt(match[1], 10);
       let name = match[2].trim();
+      // Remove set codes like (NEO) 123
       name = name.replace(/\s+\([^)]+\)\s*\d*$/, '').trim();
+      // Remove commander tags
+      name = name.replace(/\s*\*CMDR\*\s*/gi, '').trim();
+      name = name.replace(/\s*\*Commander\*\s*/gi, '').trim();
+      name = name.replace(/\s*#!Commander\s*/gi, '').trim();
+      // Remove stray asterisks
       name = name.replace(/^\*+|\*+$/g, '').trim();
 
       if (name && quantity > 0) {
-        return { name, quantity };
+        return { name, quantity, isCommander };
       }
     }
 
@@ -113,7 +121,9 @@ function parseDeckList(text: string): ParsedCard[] {
 
     const parsed = parseCardLine(line);
     if (parsed) {
-      cards.push({ ...parsed, board: currentBoard });
+      // If card has *CMDR* tag, treat it as a commander regardless of section
+      const board = parsed.isCommander ? 'commanders' : currentBoard;
+      cards.push({ name: parsed.name, quantity: parsed.quantity, board });
     }
   }
 
