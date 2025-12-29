@@ -19,6 +19,7 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -32,6 +33,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +41,63 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ===================
+# Python
+# ===================
+python-service/venv/
+python-service/.venv/
+python-service/__pycache__/
+python-service/*.pyc
+python-service/*.pyo
+python-service/*.pyd
+python-service/.Python
+python-service/pip-log.txt
+python-service/pip-delete-this-directory.txt
+*.egg-info/
+*.egg
+.eggs/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ===================
+# IDE / Editors
+# ===================
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.iml
+
+# ===================
+# OS Files
+# ===================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===================
+# Drizzle
+# ===================
+drizzle/meta/
+
+# ===================
+# Local Development
+# ===================
+*.local
+*.log
+logs/
+
+# ===================
+# Database
+# ===================
+*.sqlite
+*.sqlite3
+*.db
