@@ -2,6 +2,7 @@
 
 import { CardImage } from '@/components/card/CardImage';
 import { Button } from '@/components/ui/button';
+import { ManaText } from '@/components/ui/mana-symbol';
 import { cn } from '@/lib/utils';
 import { useDeckStore } from '@/stores/deckStore';
 import type { DeckCard as DeckCardType } from '@/types';
@@ -13,14 +14,18 @@ interface DeckCardProps {
 
 export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
   const { card, quantity, board } = deckCard;
-  const { setHoveredCard, updateCardQuantity, removeCard } = useDeckStore();
+  const { selectedCard, setSelectedCard, updateCardQuantity, removeCard } = useDeckStore();
+
+  const isSelected = selectedCard?.id === card.id;
 
   if (viewMode === 'grid') {
     return (
       <div
-        className="relative group"
-        onMouseEnter={() => setHoveredCard(card)}
-        onMouseLeave={() => setHoveredCard(null)}
+        className={cn(
+          'relative group cursor-pointer rounded-lg transition-all',
+          isSelected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        )}
+        onClick={() => setSelectedCard(isSelected ? null : card)}
       >
         <CardImage card={card} size="small" />
         {quantity > 1 && (
@@ -35,9 +40,11 @@ export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
   if (viewMode === 'visual') {
     return (
       <div
-        className="relative group"
-        onMouseEnter={() => setHoveredCard(card)}
-        onMouseLeave={() => setHoveredCard(null)}
+        className={cn(
+          'relative group cursor-pointer rounded-lg transition-all',
+          isSelected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        )}
+        onClick={() => setSelectedCard(isSelected ? null : card)}
       >
         <CardImage card={card} size="normal" />
         {quantity > 1 && (
@@ -54,25 +61,25 @@ export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
     <div
       className={cn(
         'flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 group cursor-pointer',
-        'border border-transparent hover:border-border'
+        'border border-transparent hover:border-border',
+        isSelected && 'bg-muted border-primary'
       )}
-      onMouseEnter={() => setHoveredCard(card)}
-      onMouseLeave={() => setHoveredCard(null)}
+      onClick={() => setSelectedCard(isSelected ? null : card)}
     >
       <span className="w-6 text-center font-mono text-sm text-muted-foreground">
         {quantity}x
       </span>
 
+      <div className="w-20 flex-shrink-0">
+        {card.manaCost && (
+          <ManaText text={card.manaCost} symbolSize={16} />
+        )}
+      </div>
+
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate">{card.name}</p>
         <p className="text-xs text-muted-foreground truncate">{card.typeLine}</p>
       </div>
-
-      {card.manaCost && (
-        <span className="font-mono text-sm text-muted-foreground">
-          {card.manaCost}
-        </span>
-      )}
 
       <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
         <Button

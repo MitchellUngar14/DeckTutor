@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
@@ -8,23 +8,16 @@ import { Footer } from '@/components/layout/Footer';
 import { DeckList } from '@/components/deck/DeckList';
 import { DeckStats } from '@/components/deck/DeckStats';
 import { CardPreview } from '@/components/card/CardPreview';
+import { CardImage } from '@/components/card/CardImage';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import { useDeckStore, type ViewMode, type SortBy, type GroupBy } from '@/stores/deckStore';
+import { useDeckStore } from '@/stores/deckStore';
 import { calculateDeckStats } from '@/types';
 
 export default function DeckPage() {
   const params = useParams();
-  const { currentDeck, hoveredCard, viewMode, setViewMode, sortBy, setSortBy, groupBy, setGroupBy } =
-    useDeckStore();
-  const [showSettings, setShowSettings] = useState(false);
+  const { currentDeck, selectedCard } = useDeckStore();
 
   // For now, we just use the deck from the store
   // In a full implementation, we'd fetch the deck by ID from the database
@@ -58,100 +51,50 @@ export default function DeckPage() {
   }
 
   const stats = calculateDeckStats(deck);
-  const allCards = [
-    ...deck.commanders.map((card) => ({
-      card,
-      quantity: 1,
-      board: 'commanders' as const,
-    })),
-    ...deck.mainboard,
-  ];
+  const { setSelectedCard } = useDeckStore();
+
+  // Don't include commanders in allCards - they're shown separately
+  const allCards = [...deck.mainboard];
 
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
 
-      <main className="flex-1 container py-6">
+      <main className="flex-1 container py-6 lg:pr-[380px]">
         {/* Deck Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{deck.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {deck.format.charAt(0).toUpperCase() + deck.format.slice(1)}
-              {deck.commanders.length > 0 &&
-                ` - ${deck.commanders.map((c) => c.name).join(' & ')}`}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link href={`/deck/${deck.id}/combos`}>Check Combos</Link>
-            </Button>
-            {deck.moxfieldUrl && (
-              <Button variant="outline" asChild>
-                <a href={deck.moxfieldUrl} target="_blank" rel="noopener noreferrer">
-                  View on Moxfield
-                </a>
-              </Button>
-            )}
-            <Sheet open={showSettings} onOpenChange={setShowSettings}>
-              <SheetTrigger asChild>
-                <Button variant="outline">Settings</Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>View Settings</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">View Mode</label>
-                    <div className="flex gap-2">
-                      {(['grid', 'list', 'visual'] as ViewMode[]).map((mode) => (
-                        <Button
-                          key={mode}
-                          variant={viewMode === mode ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setViewMode(mode)}
-                        >
-                          {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Sort By</label>
-                    <div className="flex flex-wrap gap-2">
-                      {(['name', 'cmc', 'type', 'color'] as SortBy[]).map((sort) => (
-                        <Button
-                          key={sort}
-                          variant={sortBy === sort ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setSortBy(sort)}
-                        >
-                          {sort.toUpperCase()}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Group By</label>
-                    <div className="flex flex-wrap gap-2">
-                      {(['type', 'cmc', 'color', 'none'] as GroupBy[]).map((group) => (
-                        <Button
-                          key={group}
-                          variant={groupBy === group ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setGroupBy(group)}
-                        >
-                          {group === 'none' ? 'None' : group.toUpperCase()}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">{deck.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {deck.format.charAt(0).toUpperCase() + deck.format.slice(1)}
+            {deck.commanders.length > 0 &&
+              ` - ${deck.commanders.map((c) => c.name).join(' & ')}`}
+          </p>
         </div>
+
+        {/* Commander Section */}
+        {deck.commanders.length > 0 && (
+          <Card className="mb-6 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+            <CardContent className="pt-6">
+              <h2 className="text-lg font-semibold mb-4 text-center">
+                {deck.commanders.length === 1 ? 'Commander' : 'Commanders'}
+              </h2>
+              <div className={`flex justify-center gap-6 ${deck.commanders.length > 1 ? 'flex-wrap' : ''}`}>
+                {deck.commanders.map((commander) => (
+                  <div
+                    key={commander.id}
+                    className="flex flex-col items-center cursor-pointer group"
+                    onClick={() => setSelectedCard(selectedCard?.id === commander.id ? null : commander)}
+                  >
+                    <div className={`transition-all ${selectedCard?.id === commander.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg' : 'group-hover:scale-105'}`}>
+                      <CardImage card={commander} size="large" priority />
+                    </div>
+                    <p className="mt-2 font-medium text-center max-w-[200px]">{commander.name}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats */}
         <div className="mb-6">
@@ -176,7 +119,7 @@ export default function DeckPage() {
             )}
           </TabsList>
 
-          <div className="grid gap-6 lg:grid-cols-[1fr,350px]">
+          <div>
             <div className="min-h-[500px] rounded-lg border">
               <TabsContent value="mainboard" className="m-0 h-full">
                 <DeckList cards={allCards} className="h-full" />
@@ -188,16 +131,17 @@ export default function DeckPage() {
                 <DeckList cards={deck.maybeboard} className="h-full" />
               </TabsContent>
             </div>
-
-            <div className="hidden lg:block">
-              <div className="sticky top-20 rounded-lg border p-4">
-                <h3 className="mb-4 font-semibold">Card Preview</h3>
-                <CardPreview card={hoveredCard} />
-              </div>
-            </div>
           </div>
         </Tabs>
       </main>
+
+      {/* Fixed Card Preview Panel */}
+      <div className="hidden lg:block fixed right-4 top-20 w-[350px] h-[calc(100vh-100px)] rounded-lg border bg-background p-4 shadow-lg overflow-hidden z-40">
+        <h3 className="mb-4 font-semibold">Card Preview</h3>
+        <div className="h-[calc(100%-2rem)] overflow-y-auto">
+          <CardPreview card={selectedCard} />
+        </div>
+      </div>
 
       <Footer />
     </div>

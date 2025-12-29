@@ -3,6 +3,7 @@
 import { CardImage } from './CardImage';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { ManaText } from '@/components/ui/mana-symbol';
 import { cn } from '@/lib/utils';
 import { MTG_COLOR_MAP, type Card, type MtgColor } from '@/types';
 
@@ -16,11 +17,11 @@ export function CardPreview({ card, className }: CardPreviewProps) {
     return (
       <div
         className={cn(
-          'flex items-center justify-center rounded-lg border border-dashed border-muted-foreground/25 bg-muted/50 p-8 text-center text-muted-foreground',
+          'flex flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/25 bg-muted/50 p-8 text-center text-muted-foreground min-h-[400px]',
           className
         )}
       >
-        <p>Hover over a card to preview</p>
+        <p>Click a card to preview</p>
       </div>
     );
   }
@@ -40,7 +41,7 @@ export function CardPreview({ card, className }: CardPreviewProps) {
         {card.manaCost && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Mana Cost:</span>
-            <span className="font-mono">{card.manaCost}</span>
+            <ManaText text={card.manaCost} symbolSize={18} />
           </div>
         )}
 
@@ -68,7 +69,9 @@ export function CardPreview({ card, className }: CardPreviewProps) {
             <Separator />
             <div className="space-y-1">
               <span className="text-sm font-medium">Oracle Text:</span>
-              <p className="text-sm whitespace-pre-line">{card.oracleText}</p>
+              <p className="text-sm whitespace-pre-line">
+                <ManaText text={card.oracleText} symbolSize={14} />
+              </p>
             </div>
           </>
         )}

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ManaText } from '@/components/ui/mana-symbol';
 import { useDeckStore } from '@/stores/deckStore';
 import type { DeckCombo, PotentialCombo } from '@/types';
 
@@ -56,7 +57,7 @@ export default function CombosPage() {
         setPotentialCombos(data.potentialCombos || []);
       } catch (err) {
         console.error('Combo check error:', err);
-        setError('Failed to connect to combo service. Make sure the Python service is running.');
+        setError('Failed to connect to Commander Spellbook. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -118,8 +119,8 @@ export default function CombosPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                The combo detection service uses a Python backend. Make sure it&apos;s
-                running at the configured URL.
+                Combo data is provided by Commander Spellbook. The service may be
+                temporarily unavailable.
               </p>
               <Button
                 variant="outline"
@@ -156,7 +157,9 @@ export default function CombosPage() {
                     <CardTitle className="text-lg">
                       {deckCombo.combo.name || 'Combo'}
                     </CardTitle>
-                    <CardDescription>{deckCombo.combo.result}</CardDescription>
+                    <CardDescription>
+                      <ManaText text={deckCombo.combo.result} />
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
@@ -174,10 +177,20 @@ export default function CombosPage() {
                         <p className="text-sm font-medium mb-2">How it works:</p>
                         <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
                           {deckCombo.combo.steps.map((step, j) => (
-                            <li key={j}>{step}</li>
+                            <li key={j}><ManaText text={step} /></li>
                           ))}
                         </ol>
                       </div>
+                    )}
+                    {deckCombo.combo.sourceUrl && (
+                      <a
+                        href={deckCombo.combo.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        View on Commander Spellbook →
+                      </a>
                     )}
                   </CardContent>
                 </Card>
@@ -198,7 +211,9 @@ export default function CombosPage() {
               {potentialCombos.map((potential, i) => (
                 <Card key={i}>
                   <CardHeader>
-                    <CardTitle className="text-lg">{potential.description}</CardTitle>
+                    <CardTitle className="text-lg">
+                      <ManaText text={potential.description} />
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
@@ -221,6 +236,16 @@ export default function CombosPage() {
                         ))}
                       </div>
                     </div>
+                    {potential.sourceUrl && (
+                      <a
+                        href={potential.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        View on Commander Spellbook →
+                      </a>
+                    )}
                   </CardContent>
                 </Card>
               ))}

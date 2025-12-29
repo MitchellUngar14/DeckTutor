@@ -152,10 +152,17 @@ export function DeckList({ cards, className }: DeckListProps) {
 
               <div
                 className={cn(
-                  viewMode === 'grid' && 'grid grid-cols-4 gap-2',
-                  viewMode === 'visual' && 'grid grid-cols-3 gap-3',
+                  viewMode === 'grid' && 'grid gap-2 justify-start',
+                  viewMode === 'visual' && 'grid gap-3 justify-start',
                   viewMode === 'list' && 'space-y-1'
                 )}
+                style={
+                  viewMode === 'grid'
+                    ? { gridTemplateColumns: 'repeat(auto-fill, 146px)' }
+                    : viewMode === 'visual'
+                    ? { gridTemplateColumns: 'repeat(auto-fill, 244px)' }
+                    : undefined
+                }
               >
                 {groupCards.map((deckCard) => (
                   <DeckCard

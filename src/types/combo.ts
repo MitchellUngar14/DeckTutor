@@ -35,4 +35,5 @@ export interface PotentialCombo {
   cards: string[];
   missingPieces: string[];
   description: string;
+  sourceUrl?: string;
 }

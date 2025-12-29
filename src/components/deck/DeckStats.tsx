@@ -86,17 +86,17 @@ export function DeckStats({ stats }: DeckStatsProps) {
           <CardTitle className="text-sm font-medium">Mana Curve</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-2 h-24">
+          <div className="flex items-end gap-2" style={{ height: '96px' }}>
             {Object.entries(stats.manaCurve)
               .sort(([a], [b]) => Number(a) - Number(b))
               .map(([cmc, count]) => {
-                const height = (count / maxCurveValue) * 100;
+                const barHeight = maxCurveValue > 0 ? (count / maxCurveValue) * 64 : 0;
                 return (
                   <div key={cmc} className="flex flex-col items-center flex-1">
-                    <div className="flex-1 w-full flex items-end">
+                    <div className="w-full flex items-end" style={{ height: '64px' }}>
                       <div
                         className="w-full bg-primary rounded-t transition-all"
-                        style={{ height: `${height}%`, minHeight: count > 0 ? '4px' : '0' }}
+                        style={{ height: `${barHeight}px`, minHeight: count > 0 ? '4px' : '0' }}
                       />
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">{cmc === '7' ? '7+' : cmc}</div>

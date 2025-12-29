@@ -1,6 +1,6 @@
 import type { MoxfieldDeck } from '@/types';
 
-const MOXFIELD_API = 'https://api2.moxfield.com';
+const MOXFIELD_API = 'https://api.moxfield.com';
 
 export class MoxfieldError extends Error {
   constructor(
@@ -39,11 +39,12 @@ export function extractDeckId(url: string): string | null {
 }
 
 export async function getDeck(deckId: string): Promise<MoxfieldDeck> {
-  const response = await fetch(`${MOXFIELD_API}/v3/decks/all/${deckId}`, {
+  const response = await fetch(`${MOXFIELD_API}/v2/decks/all/${deckId}`, {
     headers: {
-      Accept: 'application/json',
-      'User-Agent': 'DeckTutor/1.0',
+      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     },
+    cache: 'no-store',
   });
 
   if (!response.ok) {
