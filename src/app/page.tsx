@@ -10,7 +10,7 @@ export default function Home() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="container flex flex-col items-center justify-center gap-6 py-24 text-center md:py-32">
+        <section className="container mx-auto px-4 flex flex-col items-center justify-center gap-6 py-24 text-center md:py-32">
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
             Discover Combos in
             <br />
@@ -31,7 +31,7 @@ export default function Home() {
         </section>
 
         {/* Features Section */}
-        <section id="features" className="container py-16">
+        <section id="features" className="container mx-auto px-4 py-16">
           <h2 className="mb-12 text-center text-3xl font-bold">How It Works</h2>
           <div className="grid gap-8 md:grid-cols-3">
             <div className="rounded-lg border p-6 text-center">
@@ -62,7 +62,7 @@ export default function Home() {
         </section>
 
         {/* CTA Section */}
-        <section className="container py-16">
+        <section className="container mx-auto px-4 py-16">
           <div className="rounded-xl bg-muted p-8 text-center md:p-12">
             <h2 className="mb-4 text-2xl font-bold md:text-3xl">
               Ready to find hidden combos in your deck?

@@ -44,6 +44,19 @@ export interface ScryfallCard {
   layout: string;
 }
 
+export interface CardFace {
+  name: string;
+  manaCost?: string;
+  typeLine: string;
+  oracleText?: string;
+  imageUris?: {
+    small: string;
+    normal: string;
+    large: string;
+    artCrop: string;
+  };
+}
+
 export interface Card {
   id: string;
   oracleId: string;
@@ -62,6 +75,7 @@ export interface Card {
     large: string;
     artCrop: string;
   };
+  cardFaces?: CardFace[];
   prices?: {
     usd?: string;
     eur?: string;
@@ -95,14 +109,28 @@ export const MTG_COLOR_MAP: Record<MtgColor, { name: string; hex: string }> = {
 export function mapScryfallCard(scryfall: ScryfallCard): Card {
   const imageUris = scryfall.image_uris || scryfall.card_faces?.[0]?.image_uris;
 
+  // Map card faces for double-faced cards
+  const cardFaces: CardFace[] | undefined = scryfall.card_faces?.map((face) => ({
+    name: face.name,
+    manaCost: face.mana_cost,
+    typeLine: face.type_line,
+    oracleText: face.oracle_text,
+    imageUris: face.image_uris ? {
+      small: face.image_uris.small,
+      normal: face.image_uris.normal,
+      large: face.image_uris.large,
+      artCrop: face.image_uris.art_crop,
+    } : undefined,
+  }));
+
   return {
     id: scryfall.id,
     oracleId: scryfall.oracle_id,
     name: scryfall.name,
-    manaCost: scryfall.mana_cost,
+    manaCost: scryfall.mana_cost || scryfall.card_faces?.[0]?.mana_cost,
     cmc: scryfall.cmc,
     typeLine: scryfall.type_line,
-    oracleText: scryfall.oracle_text,
+    oracleText: scryfall.oracle_text || scryfall.card_faces?.[0]?.oracle_text,
     colors: scryfall.colors || [],
     colorIdentity: scryfall.color_identity,
     keywords: scryfall.keywords || [],
@@ -113,6 +141,7 @@ export function mapScryfallCard(scryfall: ScryfallCard): Card {
       large: imageUris?.large || '',
       artCrop: imageUris?.art_crop || '',
     },
+    cardFaces,
     prices: scryfall.prices ? {
       usd: scryfall.prices.usd,
       eur: scryfall.prices.eur,

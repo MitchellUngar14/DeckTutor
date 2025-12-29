@@ -6,6 +6,23 @@ const RATE_LIMIT_MS = 100;
 
 let lastRequestTime = 0;
 
+/**
+ * Normalize card names for Scryfall API.
+ * Split cards (e.g., "Dead/Gone") need special handling.
+ * Scryfall's collection API works best with just the first half of split card names.
+ */
+function normalizeCardName(name: string): string {
+  // Handle split card names: "Dead/Gone" or "Dead // Gone" -> just "Dead"
+  // Scryfall collection API finds split cards by either half
+  if (name.includes('//')) {
+    return name.split('//')[0].trim();
+  }
+  if (name.includes('/')) {
+    return name.split('/')[0].trim();
+  }
+  return name;
+}
+
 async function rateLimit(): Promise<void> {
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
@@ -30,8 +47,9 @@ export class ScryfallError extends Error {
 export async function getCardByName(name: string): Promise<Card> {
   await rateLimit();
 
+  const normalizedName = normalizeCardName(name);
   const response = await fetch(
-    `${SCRYFALL_API}/cards/named?exact=${encodeURIComponent(name)}`,
+    `${SCRYFALL_API}/cards/named?exact=${encodeURIComponent(normalizedName)}`,
     {
       headers: {
         Accept: 'application/json',
@@ -49,6 +67,37 @@ export async function getCardByName(name: string): Promise<Card> {
 
   const data: ScryfallCard = await response.json();
   return mapScryfallCard(data);
+}
+
+/**
+ * Fuzzy search for a card by name.
+ * Handles alternate card names (Secret Lair, promos, etc.) by using Scryfall's fuzzy matching.
+ * Returns the card with its canonical Oracle name, plus the original query name for mapping.
+ */
+export async function getCardByFuzzyName(name: string): Promise<{ card: Card; queryName: string } | null> {
+  await rateLimit();
+
+  const response = await fetch(
+    `${SCRYFALL_API}/cards/named?fuzzy=${encodeURIComponent(name)}`,
+    {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'DeckTutor/1.0',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    // For other errors, just return null to avoid breaking the import
+    console.warn(`Fuzzy search failed for "${name}": ${response.status}`);
+    return null;
+  }
+
+  const data: ScryfallCard = await response.json();
+  return { card: mapScryfallCard(data), queryName: name };
 }
 
 export async function getCardById(id: string): Promise<Card> {
@@ -80,10 +129,16 @@ export async function getCardsInBulk(identifiers: BulkCardIdentifier[]): Promise
 }> {
   await rateLimit();
 
+  // Normalize card names for split cards
+  const normalizedIdentifiers = identifiers.map((id) => ({
+    ...id,
+    name: id.name ? normalizeCardName(id.name) : undefined,
+  }));
+
   // Scryfall allows max 75 cards per request
   const chunks: BulkCardIdentifier[][] = [];
-  for (let i = 0; i < identifiers.length; i += 75) {
-    chunks.push(identifiers.slice(i, i + 75));
+  for (let i = 0; i < normalizedIdentifiers.length; i += 75) {
+    chunks.push(normalizedIdentifiers.slice(i, i + 75));
   }
 
   const allCards: Card[] = [];
@@ -125,8 +180,9 @@ export async function getCardsInBulk(identifiers: BulkCardIdentifier[]): Promise
 export async function searchCards(query: string, limit = 20): Promise<Card[]> {
   await rateLimit();
 
+  const normalizedQuery = normalizeCardName(query);
   const response = await fetch(
-    `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(query)}&unique=cards`,
+    `${SCRYFALL_API}/cards/search?q=${encodeURIComponent(normalizedQuery)}&unique=cards`,
     {
       headers: {
         Accept: 'application/json',
@@ -144,6 +200,51 @@ export async function searchCards(query: string, limit = 20): Promise<Card[]> {
 
   const data = await response.json();
   return data.data.slice(0, limit).map(mapScryfallCard);
+}
+
+/**
+ * Get the cheapest USD price for a card by searching all printings.
+ * Used to fill in missing price data during import.
+ */
+export async function getCheapestPrice(cardName: string): Promise<string | null> {
+  await rateLimit();
+
+  try {
+    const encodedName = encodeURIComponent(`!"${cardName}"`);
+    const response = await fetch(
+      `${SCRYFALL_API}/cards/search?q=${encodedName}&unique=prints`,
+      {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'DeckTutor/1.0',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    let cheapest: number | null = null;
+
+    for (const card of data.data || []) {
+      const priceStr = card.prices?.usd;
+      if (priceStr) {
+        const price = parseFloat(priceStr);
+        if (!isNaN(price) && price > 0) {
+          if (cheapest === null || price < cheapest) {
+            cheapest = price;
+          }
+        }
+      }
+    }
+
+    return cheapest !== null ? cheapest.toFixed(2) : null;
+  } catch (error) {
+    console.error(`Error fetching cheapest price for ${cardName}:`, error);
+    return null;
+  }
 }
 
 export async function autocomplete(query: string): Promise<string[]> {

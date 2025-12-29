@@ -190,6 +190,7 @@ export async function checkCombos(request: ComboCheckRequest): Promise<ComboChec
   return {
     combos: Array.from(foundCombos.values()),
     potentialCombos: Array.from(potentialCombos.values()).slice(0, 20),
+    synergies: [], // Synergies are detected client-side with full card data
     analyzedCards: request.cards.length,
     processingTime,
   };

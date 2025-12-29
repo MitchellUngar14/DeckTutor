@@ -12,7 +12,7 @@ export default function ImportPage() {
     <div className="flex min-h-screen flex-col">
       <Header />
 
-      <main className="flex-1 container py-12">
+      <main className="flex-1 container mx-auto px-4 py-12">
         <div className="max-w-2xl mx-auto space-y-8">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold">Import Your Deck</h1>

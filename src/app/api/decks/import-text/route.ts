@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import { getCardsInBulk } from '@/lib/clients/scryfall';
+import { getCardsInBulk, getCardByFuzzyName, getCheapestPrice } from '@/lib/clients/scryfall';
 import { calculateDeckStats, type Deck, type DeckCard } from '@/types';
 
 interface ParsedCard {
@@ -157,12 +157,79 @@ export async function POST(request: Request) {
       );
     }
 
-    if (notFound.length > 0) {
-      console.warn('Cards not found:', notFound);
+    console.log('=== DEBUG: Text Import ===');
+    console.log('Parsed cards:', parsedCards.length);
+    console.log('Unique names:', uniqueNames.length);
+    console.log('Cards from Scryfall:', cards.length);
+    console.log('Not found:', notFound);
+
+    // Build card lookup map with multiple name variations
+    const cardMap = new Map<string, typeof cards[0]>();
+    for (const card of cards) {
+      // Map by exact Scryfall name (lowercase)
+      cardMap.set(card.name.toLowerCase(), card);
+
+      // For split/double-faced cards (e.g., "Dead // Gone"), also map by variations
+      if (card.name.includes(' // ')) {
+        const [firstHalf, secondHalf] = card.name.split(' // ');
+        // Map by first half only
+        cardMap.set(firstHalf.toLowerCase(), card);
+        // Map by second half only
+        cardMap.set(secondHalf.toLowerCase(), card);
+        // Map by common separator variations
+        cardMap.set(`${firstHalf}/${secondHalf}`.toLowerCase(), card);
+        cardMap.set(`${firstHalf} / ${secondHalf}`.toLowerCase(), card);
+      }
     }
 
-    // Build card lookup map
-    const cardMap = new Map(cards.map((c) => [c.name.toLowerCase(), c]));
+    console.log('CardMap entries:', cardMap.size);
+
+    // Find cards that won't match in the cardMap and try fuzzy lookup
+    const potentiallyMissing = parsedCards.filter(
+      (p) => !cardMap.has(p.name.toLowerCase())
+    );
+
+    // Track cards converted via fuzzy search (alternate printings)
+    const convertedCards: Array<{ original: string; converted: string }> = [];
+
+    if (potentiallyMissing.length > 0) {
+      console.log('Attempting fuzzy lookup for:', potentiallyMissing.map((p) => p.name));
+
+      // Fuzzy lookup for alternate-named cards (Secret Lair, promos, etc.)
+      for (const parsed of potentiallyMissing) {
+        const result = await getCardByFuzzyName(parsed.name);
+        if (result) {
+          console.log(`Fuzzy match: "${parsed.name}" -> "${result.card.name}"`);
+          // Track the conversion
+          convertedCards.push({ original: parsed.name, converted: result.card.name });
+          // Map the alternate name to the found card
+          cardMap.set(parsed.name.toLowerCase(), result.card);
+          // Also add the canonical name if not already present
+          if (!cardMap.has(result.card.name.toLowerCase())) {
+            cardMap.set(result.card.name.toLowerCase(), result.card);
+          }
+        }
+      }
+
+      console.log('CardMap entries after fuzzy lookup:', cardMap.size);
+    }
+
+    // Fill in missing prices by looking up cheapest printings
+    const cardsWithoutPrices = Array.from(cardMap.values()).filter(
+      (card) => !card.prices?.usd
+    );
+
+    if (cardsWithoutPrices.length > 0) {
+      console.log(`Looking up prices for ${cardsWithoutPrices.length} cards without price data...`);
+
+      for (const card of cardsWithoutPrices) {
+        const cheapestPrice = await getCheapestPrice(card.name);
+        if (cheapestPrice) {
+          card.prices = { ...card.prices, usd: cheapestPrice };
+          console.log(`Set price for ${card.name}: $${cheapestPrice}`);
+        }
+      }
+    }
 
     // Group parsed cards by board
     const commanders: DeckCard[] = [];
@@ -170,9 +237,13 @@ export async function POST(request: Request) {
     const sideboard: DeckCard[] = [];
     const maybeboard: DeckCard[] = [];
 
+    const unmatchedCards: string[] = [];
     for (const parsed of parsedCards) {
       const card = cardMap.get(parsed.name.toLowerCase());
-      if (!card) continue;
+      if (!card) {
+        unmatchedCards.push(parsed.name);
+        continue;
+      }
 
       const deckCard: DeckCard = {
         card,
@@ -193,6 +264,10 @@ export async function POST(request: Request) {
         default:
           mainboard.push(deckCard);
       }
+    }
+
+    if (unmatchedCards.length > 0) {
+      console.log('Unmatched cards (not in cardMap):', unmatchedCards);
     }
 
     // Extract commander cards for the deck structure
@@ -217,14 +292,39 @@ export async function POST(request: Request) {
 
     const stats = calculateDeckStats(deck);
 
-    // Include info about cards that weren't found
-    const response: { deck: Deck; stats: typeof stats; warnings?: string[] } = {
+    // Build response with appropriate warnings
+    const warnings: string[] = [];
+    const info: string[] = [];
+
+    // Cards converted from alternate printings (fuzzy matched)
+    if (convertedCards.length > 0) {
+      info.push(
+        `${convertedCards.length} card${convertedCards.length > 1 ? 's' : ''} converted to original printing: ${convertedCards.map((c) => `${c.original} → ${c.converted}`).join(', ')}`
+      );
+    }
+
+    // Cards truly not found (after all lookup attempts)
+    if (unmatchedCards.length > 0) {
+      warnings.push(
+        `${unmatchedCards.length} card${unmatchedCards.length > 1 ? 's' : ''} not found: ${unmatchedCards.join(', ')}`
+      );
+    }
+
+    const response: {
+      deck: Deck;
+      stats: typeof stats;
+      warnings?: string[];
+      info?: string[];
+    } = {
       deck,
       stats,
     };
 
-    if (notFound.length > 0) {
-      response.warnings = notFound.map((name) => `Card not found: ${name}`);
+    if (warnings.length > 0) {
+      response.warnings = warnings;
+    }
+    if (info.length > 0) {
+      response.info = info;
     }
 
     return NextResponse.json(response);

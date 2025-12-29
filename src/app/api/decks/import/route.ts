@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { extractDeckId, getDeck, MoxfieldError } from '@/lib/clients/moxfield';
-import { getCardsInBulk } from '@/lib/clients/scryfall';
-import { calculateDeckStats, type Deck, type DeckCard } from '@/types';
+import { getCardsInBulk, getCardByFuzzyName, getCheapestPrice } from '@/lib/clients/scryfall';
+import { calculateDeckStats, type Deck, type DeckCard, type Card } from '@/types';
 
 export async function POST(request: Request) {
   try {
@@ -27,21 +27,30 @@ export async function POST(request: Request) {
     // Fetch deck from Moxfield
     const moxfieldDeck = await getDeck(deckId);
 
-    // Collect all card names
-    const cardNames: string[] = [];
-    const cardQuantities: Record<string, { quantity: number; board: DeckCard['board'] }[]> = {};
+    // Collect all Scryfall IDs from Moxfield data
+    const scryfallIds: string[] = [];
+    const cardEntries: Array<{
+      scryfallId: string;
+      name: string;
+      quantity: number;
+      board: DeckCard['board'];
+    }> = [];
 
     const processCards = (
       cards: Record<string, { quantity: number; card: { name: string; scryfall_id: string } }>,
       board: DeckCard['board']
     ) => {
       for (const [, entry] of Object.entries(cards)) {
-        const name = entry.card.name;
-        if (!cardQuantities[name]) {
-          cardQuantities[name] = [];
-          cardNames.push(name);
+        const scryfallId = entry.card.scryfall_id;
+        if (scryfallId && !scryfallIds.includes(scryfallId)) {
+          scryfallIds.push(scryfallId);
         }
-        cardQuantities[name].push({ quantity: entry.quantity, board });
+        cardEntries.push({
+          scryfallId,
+          name: entry.card.name,
+          quantity: entry.quantity,
+          board,
+        });
       }
     };
 
@@ -50,30 +59,101 @@ export async function POST(request: Request) {
     processCards(moxfieldDeck.sideboard, 'sideboard');
     processCards(moxfieldDeck.maybeboard, 'maybeboard');
 
-    // Fetch card data from Scryfall
+    console.log('=== DEBUG: Import Summary ===');
+    console.log('Total card entries:', cardEntries.length);
+    console.log('Unique Scryfall IDs:', scryfallIds.length);
+    console.log('Commanders:', cardEntries.filter(e => e.board === 'commanders').map(e => ({ name: e.name, id: e.scryfallId })));
+    console.log('Sample mainboard entries:', cardEntries.filter(e => e.board === 'mainboard').slice(0, 5).map(e => ({ name: e.name, id: e.scryfallId })));
+
+    // Fetch card data from Scryfall using IDs (more reliable than names)
     const { cards, notFound } = await getCardsInBulk(
-      cardNames.map((name) => ({ name }))
+      scryfallIds.map((id) => ({ id }))
     );
 
+    console.log('Cards fetched from Scryfall:', cards.length);
     if (notFound.length > 0) {
-      console.warn('Cards not found:', notFound);
+      console.warn('Cards not found by ID:', notFound);
     }
 
-    // Build deck structure
-    const cardMap = new Map(cards.map((c) => [c.name, c]));
+    // Check for entries with missing/empty scryfall IDs
+    const entriesWithoutId = cardEntries.filter(e => !e.scryfallId);
+    if (entriesWithoutId.length > 0) {
+      console.warn('Entries missing Scryfall ID:', entriesWithoutId.map(e => e.name));
+    }
 
-    const commanders = Object.values(moxfieldDeck.commanders)
-      .map((entry) => cardMap.get(entry.card.name))
+    // Build card map by Scryfall ID
+    const cardMap = new Map(cards.map((c) => [c.id, c]));
+
+    // Fallback: fuzzy lookup for entries with missing IDs or IDs not found
+    const missingEntries = cardEntries.filter(
+      (e) => !e.scryfallId || !cardMap.has(e.scryfallId)
+    );
+
+    // Track converted and not found cards
+    const convertedCards: Array<{ original: string; converted: string }> = [];
+    const notFoundCards: string[] = [];
+
+    if (missingEntries.length > 0) {
+      console.log('Attempting fuzzy lookup for missing cards:', missingEntries.map((e) => e.name));
+
+      // Map to store fuzzy-matched cards by their original entry name
+      const fuzzyMatches = new Map<string, Card>();
+
+      for (const entry of missingEntries) {
+        const result = await getCardByFuzzyName(entry.name);
+        if (result) {
+          console.log(`Fuzzy match: "${entry.name}" -> "${result.card.name}"`);
+          fuzzyMatches.set(entry.name.toLowerCase(), result.card);
+          // Track the conversion
+          convertedCards.push({ original: entry.name, converted: result.card.name });
+          // Also add to cardMap by the card's ID for consistency
+          cardMap.set(result.card.id, result.card);
+        } else {
+          console.warn(`Could not find card: "${entry.name}"`);
+          notFoundCards.push(entry.name);
+        }
+      }
+
+      // Update missing entries with their fuzzy-matched Scryfall IDs
+      for (const entry of missingEntries) {
+        const match = fuzzyMatches.get(entry.name.toLowerCase());
+        if (match) {
+          entry.scryfallId = match.id;
+        }
+      }
+    }
+
+    // Fill in missing prices by looking up cheapest printings
+    const cardsWithoutPrices = Array.from(cardMap.values()).filter(
+      (card) => !card.prices?.usd
+    );
+
+    if (cardsWithoutPrices.length > 0) {
+      console.log(`Looking up prices for ${cardsWithoutPrices.length} cards without price data...`);
+
+      for (const card of cardsWithoutPrices) {
+        const cheapestPrice = await getCheapestPrice(card.name);
+        if (cheapestPrice) {
+          card.prices = { ...card.prices, usd: cheapestPrice };
+          console.log(`Set price for ${card.name}: $${cheapestPrice}`);
+        }
+      }
+    }
+
+    const commanders = cardEntries
+      .filter((e) => e.board === 'commanders')
+      .map((entry) => cardMap.get(entry.scryfallId))
       .filter((c): c is NonNullable<typeof c> => c !== undefined);
 
-    const buildDeckCards = (
-      moxfieldCards: Record<string, { quantity: number; card: { name: string } }>,
-      board: DeckCard['board']
-    ): DeckCard[] => {
-      return Object.values(moxfieldCards)
+    const buildDeckCards = (board: DeckCard['board']): DeckCard[] => {
+      return cardEntries
+        .filter((e) => e.board === board)
         .map((entry) => {
-          const card = cardMap.get(entry.card.name);
-          if (!card) return null;
+          const card = cardMap.get(entry.scryfallId);
+          if (!card) {
+            console.warn(`Card not found: "${entry.name}" (ID: ${entry.scryfallId})`);
+            return null;
+          }
           return {
             card,
             quantity: entry.quantity,
@@ -89,9 +169,9 @@ export async function POST(request: Request) {
       description: moxfieldDeck.description,
       format: (moxfieldDeck.format as Deck['format']) || 'commander',
       commanders,
-      mainboard: buildDeckCards(moxfieldDeck.mainboard, 'mainboard'),
-      sideboard: buildDeckCards(moxfieldDeck.sideboard, 'sideboard'),
-      maybeboard: buildDeckCards(moxfieldDeck.maybeboard, 'maybeboard'),
+      mainboard: buildDeckCards('mainboard'),
+      sideboard: buildDeckCards('sideboard'),
+      maybeboard: buildDeckCards('maybeboard'),
       moxfieldId: moxfieldDeck.id,
       moxfieldUrl: `https://www.moxfield.com/decks/${moxfieldDeck.publicId}`,
       importedAt: new Date().toISOString(),
@@ -100,7 +180,42 @@ export async function POST(request: Request) {
 
     const stats = calculateDeckStats(deck);
 
-    return NextResponse.json({ deck, stats });
+    // Build response with appropriate warnings/info
+    const warnings: string[] = [];
+    const info: string[] = [];
+
+    // Cards converted from alternate printings (fuzzy matched)
+    if (convertedCards.length > 0) {
+      info.push(
+        `${convertedCards.length} card${convertedCards.length > 1 ? 's' : ''} converted to original printing: ${convertedCards.map((c) => `${c.original} → ${c.converted}`).join(', ')}`
+      );
+    }
+
+    // Cards truly not found
+    if (notFoundCards.length > 0) {
+      warnings.push(
+        `${notFoundCards.length} card${notFoundCards.length > 1 ? 's' : ''} not found: ${notFoundCards.join(', ')}`
+      );
+    }
+
+    const response: {
+      deck: Deck;
+      stats: typeof stats;
+      warnings?: string[];
+      info?: string[];
+    } = {
+      deck,
+      stats,
+    };
+
+    if (warnings.length > 0) {
+      response.warnings = warnings;
+    }
+    if (info.length > 0) {
+      response.info = info;
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Import error:', error);
 

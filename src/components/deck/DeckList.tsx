@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { DeckCard } from './DeckCard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -108,6 +109,7 @@ function getGroupOrder(groupBy: GroupBy): string[] {
 
 export function DeckList({ cards, className }: DeckListProps) {
   const { viewMode, sortBy, groupBy } = useDeckStore();
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const { groupedCards, sortedGroups } = useMemo(() => {
     const sorted = sortCards(cards, sortBy);
@@ -128,6 +130,18 @@ export function DeckList({ cards, className }: DeckListProps) {
 
   const totalCards = cards.reduce((sum, c) => sum + c.quantity, 0);
 
+  const toggleGroup = (groupName: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
+  };
+
   return (
     <ScrollArea className={cn('h-full', className)}>
       <div className="space-y-4 p-4">
@@ -138,40 +152,53 @@ export function DeckList({ cards, className }: DeckListProps) {
         {sortedGroups.map((groupName) => {
           const groupCards = groupedCards[groupName];
           const groupCount = groupCards.reduce((sum, c) => sum + c.quantity, 0);
+          const isCollapsed = collapsedGroups.has(groupName);
 
           return (
             <div key={groupName} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-sm">
-                  {groupName}
-                </h3>
+              <button
+                onClick={() => toggleGroup(groupName)}
+                className="flex items-center justify-between w-full text-left hover:bg-muted/50 rounded px-2 py-1 -mx-2 transition-colors"
+              >
+                <div className="flex items-center gap-1">
+                  {isCollapsed ? (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <h3 className="font-semibold text-sm">
+                    {groupName}
+                  </h3>
+                </div>
                 <span className="text-xs text-muted-foreground">
                   ({groupCount})
                 </span>
-              </div>
+              </button>
 
-              <div
-                className={cn(
-                  viewMode === 'grid' && 'grid gap-2 justify-start',
-                  viewMode === 'visual' && 'grid gap-3 justify-start',
-                  viewMode === 'list' && 'space-y-1'
-                )}
-                style={
-                  viewMode === 'grid'
-                    ? { gridTemplateColumns: 'repeat(auto-fill, 146px)' }
-                    : viewMode === 'visual'
-                    ? { gridTemplateColumns: 'repeat(auto-fill, 244px)' }
-                    : undefined
-                }
-              >
-                {groupCards.map((deckCard) => (
-                  <DeckCard
-                    key={`${deckCard.card.id}-${deckCard.board}`}
-                    deckCard={deckCard}
-                    viewMode={viewMode}
-                  />
-                ))}
-              </div>
+              {!isCollapsed && (
+                <div
+                  className={cn(
+                    viewMode === 'grid' && 'grid gap-2 justify-start',
+                    viewMode === 'visual' && 'grid gap-3 justify-start',
+                    viewMode === 'list' && 'space-y-1'
+                  )}
+                  style={
+                    viewMode === 'grid'
+                      ? { gridTemplateColumns: 'repeat(auto-fill, 146px)' }
+                      : viewMode === 'visual'
+                      ? { gridTemplateColumns: 'repeat(auto-fill, 244px)' }
+                      : undefined
+                  }
+                >
+                  {groupCards.map((deckCard) => (
+                    <DeckCard
+                      key={`${deckCard.card.id}-${deckCard.board}`}
+                      deckCard={deckCard}
+                      viewMode={viewMode}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

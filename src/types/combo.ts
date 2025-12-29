@@ -18,6 +18,31 @@ export interface DeckCombo {
   missingCards: string[];
 }
 
+export interface Synergy {
+  id: string;
+  type: SynergyType;
+  cards: string[];
+  suggestedCards?: string[];
+  description: string;
+  strength: 'strong' | 'moderate' | 'minor';
+}
+
+export type SynergyType =
+  | 'tribal'
+  | 'keyword'
+  | 'sacrifice'
+  | 'tokens'
+  | 'counters'
+  | 'graveyard'
+  | 'artifacts'
+  | 'enchantments'
+  | 'lands'
+  | 'spellslinger'
+  | 'voltron'
+  | 'ramp'
+  | 'draw'
+  | 'commander';
+
 export interface ComboCheckRequest {
   deckId?: string;
   cards: string[];
@@ -27,6 +52,7 @@ export interface ComboCheckRequest {
 export interface ComboCheckResponse {
   combos: DeckCombo[];
   potentialCombos: PotentialCombo[];
+  synergies: Synergy[];
   analyzedCards: number;
   processingTime: number;
 }

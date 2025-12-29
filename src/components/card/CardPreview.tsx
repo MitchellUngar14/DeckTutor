@@ -5,11 +5,39 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ManaText } from '@/components/ui/mana-symbol';
 import { cn } from '@/lib/utils';
-import { MTG_COLOR_MAP, type Card, type MtgColor } from '@/types';
+import { MTG_COLOR_MAP, type Card, type CardFace, type MtgColor } from '@/types';
+
+// Layouts that have two distinct faces with separate images
+const DOUBLE_FACED_LAYOUTS = [
+  'transform',
+  'modal_dfc',
+  'reversible_card',
+  'double_faced_token',
+];
 
 interface CardPreviewProps {
   card: Card | null;
   className?: string;
+}
+
+function FaceDetails({ face, label }: { face: CardFace; label: string }) {
+  return (
+    <div className="space-y-2 rounded-lg bg-muted/30 p-3">
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="text-xs">{label}</Badge>
+        {face.manaCost && <ManaText text={face.manaCost} symbolSize={14} />}
+      </div>
+      <div>
+        <h4 className="font-medium">{face.name}</h4>
+        <p className="text-xs text-muted-foreground">{face.typeLine}</p>
+      </div>
+      {face.oracleText && (
+        <p className="text-sm whitespace-pre-line">
+          <ManaText text={face.oracleText} symbolSize={12} />
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function CardPreview({ card, className }: CardPreviewProps) {
@@ -26,23 +54,56 @@ export function CardPreview({ card, className }: CardPreviewProps) {
     );
   }
 
+  const isDoubleFaced = DOUBLE_FACED_LAYOUTS.includes(card.layout) &&
+    card.cardFaces &&
+    card.cardFaces.length >= 2;
+
   return (
     <div className={cn('space-y-4', className)}>
       <div className="flex justify-center">
         <CardImage card={card} size="large" priority />
       </div>
 
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-lg font-semibold">{card.name}</h3>
-          <p className="text-sm text-muted-foreground">{card.typeLine}</p>
-        </div>
+      {isDoubleFaced && (
+        <p className="text-xs text-center text-muted-foreground">
+          Hover over card and click the flip button to see other side
+        </p>
+      )}
 
-        {card.manaCost && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Mana Cost:</span>
-            <ManaText text={card.manaCost} symbolSize={18} />
+      <div className="space-y-3">
+        {/* Show face details for double-faced cards */}
+        {isDoubleFaced && card.cardFaces ? (
+          <div className="space-y-3">
+            <FaceDetails face={card.cardFaces[0]} label="Front" />
+            <FaceDetails face={card.cardFaces[1]} label="Back" />
           </div>
+        ) : (
+          /* Regular card details */
+          <>
+            <div>
+              <h3 className="text-lg font-semibold">{card.name}</h3>
+              <p className="text-sm text-muted-foreground">{card.typeLine}</p>
+            </div>
+
+            {card.manaCost && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Mana Cost:</span>
+                <ManaText text={card.manaCost} symbolSize={18} />
+              </div>
+            )}
+
+            {card.oracleText && (
+              <>
+                <Separator />
+                <div className="space-y-1">
+                  <span className="text-sm font-medium">Oracle Text:</span>
+                  <p className="text-sm whitespace-pre-line">
+                    <ManaText text={card.oracleText} symbolSize={14} />
+                  </p>
+                </div>
+              </>
+            )}
+          </>
         )}
 
         {card.colorIdentity.length > 0 && (
@@ -62,18 +123,6 @@ export function CardPreview({ card, className }: CardPreviewProps) {
               ))}
             </div>
           </div>
-        )}
-
-        {card.oracleText && (
-          <>
-            <Separator />
-            <div className="space-y-1">
-              <span className="text-sm font-medium">Oracle Text:</span>
-              <p className="text-sm whitespace-pre-line">
-                <ManaText text={card.oracleText} symbolSize={14} />
-              </p>
-            </div>
-          </>
         )}
 
         <Separator />

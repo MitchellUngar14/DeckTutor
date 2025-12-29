@@ -101,3 +101,25 @@ logs/
 *.sqlite
 *.sqlite3
 *.db
+
+# ===================
+# AI / Claude Code
+# ===================
+CLAUDE.md
+.claude/
+.cursorrules
+.aider*
+.continue/
+copilot-*
+
+# ===================
+# Secrets / Credentials
+# ===================
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+secrets/

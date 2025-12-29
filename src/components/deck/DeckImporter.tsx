@@ -51,7 +51,15 @@ export function DeckImporter() {
       setImportState({ importStage: 'ready', importProgress: 100 });
       setCurrentDeck(data.deck);
 
-      toast.success(`Imported "${data.deck.name}" successfully!`);
+      // Show appropriate toast based on warnings/info
+      if (data.warnings && data.warnings.length > 0) {
+        toast.warning(data.warnings[0]);
+      } else if (data.info && data.info.length > 0) {
+        toast.success(`Imported "${data.deck.name}" successfully!`);
+        toast.info(data.info[0]);
+      } else {
+        toast.success(`Imported "${data.deck.name}" successfully!`);
+      }
       router.push(`/deck/${data.deck.id}`);
     } catch (error) {
       setImportState({ importStage: 'error', isImporting: false });
@@ -96,8 +104,12 @@ export function DeckImporter() {
       setImportState({ importStage: 'ready', importProgress: 100 });
       setCurrentDeck(data.deck);
 
+      // Show appropriate toast based on warnings/info
       if (data.warnings && data.warnings.length > 0) {
-        toast.warning(`Imported "${data.deck.name}" with ${data.warnings.length} card(s) not found`);
+        toast.warning(data.warnings[0]);
+      } else if (data.info && data.info.length > 0) {
+        toast.success(`Imported "${data.deck.name}" successfully!`);
+        toast.info(data.info[0]);
       } else {
         toast.success(`Imported "${data.deck.name}" successfully!`);
       }
@@ -157,21 +169,17 @@ Example (Moxfield text export):
           </TabsContent>
 
           <TabsContent value="url" className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="https://www.moxfield.com/decks/..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleUrlImport()}
-              />
-              <Button onClick={handleUrlImport} disabled={isLoading}>
-                {isLoading ? '...' : 'Import'}
-              </Button>
+            <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+              <div className="text-4xl">🚧</div>
+              <h3 className="text-lg font-semibold">Under Construction</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Direct Moxfield URL import is temporarily unavailable while we work on API access.
+                Please use the &quot;Paste Deck List&quot; option instead.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Export from Moxfield: Click the three dots → &quot;Export&quot; → &quot;Text&quot;
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Note: URL import may not work due to Moxfield&apos;s Cloudflare protection.
-              If it fails, use the &quot;Paste Deck List&quot; option instead.
-            </p>
           </TabsContent>
         </Tabs>
       </CardContent>
