@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" fill="none">
+
+  <!-- Background -->
+  <rect x="72" y="72" width="368" height="368" rx="96" fill="#000"></rect>
+
+  <!-- DT + cap group (optically centered) -->
+  <g transform="translate(-6,4)">
+    <!-- DT letters -->
+    <g fill="#fff">
+      <!-- D -->
+      <path d="
+        M146 186
+        H228
+        C290 186 330 224 330 264
+        C330 304 290 342 228 342
+        H146
+        Z"></path>
+
+      <!-- D inner -->
+      <path d="
+        M188 222
+        H224
+        C256 222 278 242 278 264
+        C278 286 256 306 224 306
+        H188
+        Z" fill="#000"></path>
+
+      <!-- T (square, equal weight) -->
+      <rect x="292" y="186" width="110" height="26"></rect>
+      <rect x="334" y="212" width="26" height="130"></rect>
+    </g>
+
+    <!-- Graduation cap sitting on D corner -->
+    <g transform="translate(160 170) rotate(-16)">
+      <!-- Cap top -->
+      <path d="M0 22 L44 6 L88 22 L44 38 Z" fill="#000"></path>
+      <path d="M0 22 L44 6 L88 22 L44 38 Z" stroke="#fff" stroke-width="4"></path>
+
+      <!-- Cap band -->
+      <path d="M14 26 V42 C14 50 30 56 44 56 C58 56 74 50 74 42 V26 L44 38 Z" fill="#000"></path>
+      <path d="M14 26 V42 C14 50 30 56 44 56 C58 56 74 50 74 42 V26" stroke="#fff" stroke-width="4"></path>
+
+      <!-- Tassel -->
+      <path d="M88 22 V50" stroke="#fff" stroke-width="4" stroke-linecap="round"></path>
+      <circle cx="88" cy="56" r="5" fill="#fff"></circle>
+    </g>
+  </g>
+
+</svg>
