@@ -56,6 +56,9 @@ export function Header() {
           {showDeckActions && (
             <>
               <Button variant="outline" size="sm" asChild>
+                <Link href={`/deck/${currentDeck.id}/chat`}>Chat</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
                 <Link href={`/deck/${currentDeck.id}/combos`}>Check Combos</Link>
               </Button>
               {currentDeck.moxfieldUrl && (
@@ -124,6 +127,9 @@ export function Header() {
               </Sheet>
             </>
           )}
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/chat">AI Chat</Link>
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/deck/import">Import Deck</Link>
           </Button>
@@ -194,6 +200,11 @@ export function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
+                <Link href="/chat" onClick={() => setMobileMenuOpen(false)}>
+                  AI Chat
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
                 <Link href="/deck/import" onClick={() => setMobileMenuOpen(false)}>
                   Import Deck
                 </Link>
@@ -206,6 +217,11 @@ export function Header() {
               {showDeckActions && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href={`/deck/${currentDeck.id}/chat`} onClick={() => setMobileMenuOpen(false)}>
+                      Chat about Deck
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href={`/deck/${currentDeck.id}/combos`} onClick={() => setMobileMenuOpen(false)}>
                       Check Combos
