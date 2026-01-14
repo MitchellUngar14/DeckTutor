@@ -186,6 +186,26 @@ export const userDeckCombos = pgTable('user_deck_combos', {
   notes: text('notes'),
 });
 
+// ============================================
+// CUSTOM COMBOS (User-created, deck-specific)
+// ============================================
+export const customCombos = pgTable('custom_combos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  deckId: uuid('deck_id')
+    .notNull()
+    .references(() => userDecks.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description').notNull(),
+  cardNames: text('card_names').array().notNull(),
+  cardIds: text('card_ids').array(),
+  colorIdentity: text('color_identity').array(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const oauthAccounts = pgTable('oauth_accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')

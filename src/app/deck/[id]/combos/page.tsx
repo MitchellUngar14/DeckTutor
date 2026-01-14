@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { Sparkles, Zap, Target, X, Loader2 } from 'lucide-react';
+import { Sparkles, Zap, Target, X, Loader2, Plus, Wand2 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
@@ -146,7 +147,16 @@ const STRENGTH_COLORS = {
   minor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
 };
 
+interface CustomCombo {
+  id: string;
+  name: string;
+  description: string;
+  cardNames: string[];
+  createdAt: string;
+}
+
 export default function CombosPage() {
+  const { user } = useAuth();
   const { currentDeck } = useDeckStore();
   const [combos, setCombos] = useState<DeckCombo[]>([]);
   const [potentialCombos, setPotentialCombos] = useState<PotentialCombo[]>([]);
@@ -157,6 +167,8 @@ export default function CombosPage() {
   const [externalCardCache, setExternalCardCache] = useState<Map<string, CardType>>(new Map());
   const [synergySuggestions, setSynergySuggestions] = useState<Map<string, string[]>>(new Map());
   const [loadingSynergyId, setLoadingSynergyId] = useState<string | null>(null);
+  const [customCombos, setCustomCombos] = useState<CustomCombo[]>([]);
+  const [loadingCustomCombos, setLoadingCustomCombos] = useState(false);
 
   // Build a map of card names to card objects for quick lookup
   const cardMap = useMemo(() => {
@@ -290,6 +302,34 @@ export default function CombosPage() {
     return detectSynergies(allCards, commander);
   }, [currentDeck]);
 
+  // Fetch custom combos when user is authenticated and deck is loaded
+  useEffect(() => {
+    async function fetchCustomCombos() {
+      if (!user || !currentDeck) return;
+
+      setLoadingCustomCombos(true);
+      try {
+        const token = localStorage.getItem('decktutor-token');
+        const response = await fetch(`/api/user/decks/${currentDeck.id}/combos`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setCustomCombos(data.combos || []);
+        }
+      } catch (err) {
+        console.error('Error fetching custom combos:', err);
+      } finally {
+        setLoadingCustomCombos(false);
+      }
+    }
+
+    fetchCustomCombos();
+  }, [user, currentDeck]);
+
   useEffect(() => {
     async function checkCombos() {
       if (!currentDeck) return;
@@ -405,18 +445,22 @@ export default function CombosPage() {
         </div>
 
         <Tabs defaultValue="synergies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="synergies" className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
-              Synergies ({synergies.length})
+              <span className="hidden sm:inline">Synergies</span> ({synergies.length})
             </TabsTrigger>
             <TabsTrigger value="combos" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
-              Combos {isLoading ? '(...)' : `(${combos.length})`}
+              <span className="hidden sm:inline">Combos</span> {isLoading ? '(...)' : `(${combos.length})`}
             </TabsTrigger>
             <TabsTrigger value="potential" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
-              Potential {isLoading ? '(...)' : `(${potentialCombos.length})`}
+              <span className="hidden sm:inline">Potential</span> {isLoading ? '(...)' : `(${potentialCombos.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="custom" className="flex items-center gap-2">
+              <Wand2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Custom</span> ({customCombos.length})
             </TabsTrigger>
           </TabsList>
 
@@ -706,6 +750,149 @@ export default function CombosPage() {
                     </Card>
                   ))}
                 </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Custom Combos Tab */}
+          <TabsContent value="custom" className="space-y-6">
+            {!user ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Sign in to use Custom Combos</CardTitle>
+                  <CardDescription>
+                    Create your own combo definitions to track synergies that Commander
+                    Spellbook might not have.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button asChild>
+                    <Link href="/auth/signin">Sign In</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : loadingCustomCombos ? (
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-muted-foreground">
+                    Your custom combo definitions
+                  </p>
+                  <Button asChild size="sm">
+                    <Link href={`/deck/${currentDeck.id}/combos/create`}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Combo
+                    </Link>
+                  </Button>
+                </div>
+
+                {customCombos.length === 0 ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>No custom combos yet</CardTitle>
+                      <CardDescription>
+                        Create your own combo definitions to track synergies that
+                        Commander Spellbook might not have.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button asChild>
+                        <Link href={`/deck/${currentDeck.id}/combos/create`}>Create Your First Combo</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {customCombos.map((combo) => {
+                      // Check which cards from this combo are in the current deck
+                      const presentCards = combo.cardNames.filter((name) =>
+                        cardMap.has(name.toLowerCase())
+                      );
+                      const missingCards = combo.cardNames.filter(
+                        (name) => !cardMap.has(name.toLowerCase())
+                      );
+
+                      return (
+                        <Card key={combo.id}>
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-lg">{combo.name}</CardTitle>
+                              <Badge
+                                variant={
+                                  missingCards.length === 0 ? 'default' : 'secondary'
+                                }
+                              >
+                                {presentCards.length}/{combo.cardNames.length} pieces
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div>
+                              <p className="text-sm font-medium mb-2">Cards:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {combo.cardNames.map((cardName) => {
+                                  const inDeck = cardMap.has(cardName.toLowerCase());
+                                  const isLoading = loadingCardName === cardName;
+                                  const isSelected =
+                                    selectedCard?.name.toLowerCase() ===
+                                    cardName.toLowerCase();
+
+                                  if (inDeck) {
+                                    return (
+                                      <CardBadge
+                                        key={cardName}
+                                        name={cardName}
+                                        variant="secondary"
+                                      />
+                                    );
+                                  }
+
+                                  return (
+                                    <Badge
+                                      key={cardName}
+                                      variant="destructive"
+                                      className={`cursor-pointer transition-all hover:scale-105 ${
+                                        isSelected
+                                          ? 'ring-2 ring-primary ring-offset-1'
+                                          : ''
+                                      }`}
+                                      onClick={() => fetchExternalCard(cardName)}
+                                      title="Card not in deck - Click to preview"
+                                    >
+                                      {isLoading ? (
+                                        <span className="flex items-center gap-1">
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                          {cardName}
+                                        </span>
+                                      ) : (
+                                        cardName
+                                      )}
+                                    </Badge>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium mb-2">How it works:</p>
+                              <p className="text-sm text-muted-foreground whitespace-pre-line">
+                                {combo.description}
+                              </p>
+                            </div>
+                            <div className="flex justify-end">
+                              <Button variant="ghost" size="sm" asChild>
+                                <Link href={`/deck/${currentDeck.id}/combos/${combo.id}/edit`}>Edit</Link>
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
           </TabsContent>

@@ -4,3 +4,4 @@ export { ChatMessageList } from './ChatMessageList';
 export { ChatInput } from './ChatInput';
 export { ChatSettings } from './ChatSettings';
 export { DeckContextPreview } from './DeckContextPreview';
+export { AuthGate } from './AuthGate';

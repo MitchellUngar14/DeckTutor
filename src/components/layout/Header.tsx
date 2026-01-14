@@ -20,11 +20,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useDeckStore, type ViewMode, type SortBy, type GroupBy } from '@/stores/deckStore';
+import { useAuth } from '@/context/AuthContext';
+import { SaveDeckButton } from '@/components/deck/SaveDeckButton';
 
 export function Header() {
   const pathname = usePathname();
   const { currentDeck, viewMode, setViewMode, sortBy, setSortBy, groupBy, setGroupBy } = useDeckStore();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const { user, loading: authLoading, signout } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -53,6 +56,7 @@ export function Header() {
         <div className="hidden md:flex flex-1 items-center justify-end space-x-2">
           {showDeckActions && (
             <>
+              {user && <SaveDeckButton />}
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/deck/${currentDeck.id}/chat`}>Chat</Link>
               </Button>
@@ -131,6 +135,41 @@ export function Header() {
           <Button variant="outline" size="sm" asChild>
             <Link href="/deck/import">Import Deck</Link>
           </Button>
+          {/* Auth UI */}
+          {mounted && !authLoading && (
+            user ? (
+              <>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/decks">Saved Decks</Link>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      {user.displayName}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href="/decks">Saved Decks</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signout}>
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/auth/signin">Sign In</Link>
+                </Button>
+                <Button variant="default" size="sm" asChild>
+                  <Link href="/auth/signup">Sign Up</Link>
+                </Button>
+              </>
+            )
+          )}
           {mounted && (
             <Button variant="ghost" size="sm" onClick={toggleTheme} className="px-2">
               {resolvedTheme === 'dark' ? (
@@ -211,6 +250,34 @@ export function Header() {
                 <DropdownMenuItem onClick={() => { setMobileMenuOpen(false); toggleTheme(); }}>
                   {resolvedTheme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                 </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              {mounted && !authLoading && (
+                user ? (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/decks" onClick={() => setMobileMenuOpen(false)}>
+                        Saved Decks
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setMobileMenuOpen(false); signout(); }}>
+                      Sign Out ({user.displayName})
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/auth/signin" onClick={() => setMobileMenuOpen(false)}>
+                        Sign In
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/auth/signup" onClick={() => setMobileMenuOpen(false)}>
+                        Sign Up
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )
               )}
               {showDeckActions && (
                 <>

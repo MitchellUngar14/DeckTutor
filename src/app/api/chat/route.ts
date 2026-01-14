@@ -1,10 +1,30 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { geminiChat, buildSystemPrompt, GeminiError } from '@/lib/clients/gemini';
 import { openaiChat, OpenAIError } from '@/lib/clients/openai';
+import { verifyToken, extractBearerToken } from '@/lib/auth';
 import type { ChatRequest, ChatResponse, GeminiModel, OpenAIModel } from '@/types';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Require authentication for chat
+    const authHeader = request.headers.get('authorization');
+    const token = extractBearerToken(authHeader);
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'UNAUTHORIZED', message: 'Authentication required for AI chat' },
+        { status: 401 }
+      );
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(
+        { error: 'UNAUTHORIZED', message: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
     const body: ChatRequest = await request.json();
 
     // Validate request

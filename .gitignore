@@ -111,6 +111,7 @@ CLAUDE.md
 .aider*
 .continue/
 copilot-*
+tmpclaude-*
 
 # ===================
 # Secrets / Credentials

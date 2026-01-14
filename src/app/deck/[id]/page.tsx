@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
@@ -14,7 +14,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { X, RefreshCw } from 'lucide-react';
 import { useDeckStore } from '@/stores/deckStore';
-import { calculateDeckStats, type Deck, type Card as CardType } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+import { calculateDeckStats, type Deck, type Card as CardType, type DeckCard } from '@/types';
 
 const BASIC_LAND_NAMES = [
   'Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Wastes',
@@ -56,18 +57,86 @@ function calculateDeckValue(deck: Deck, excludeBasicLands: boolean = false): num
 
 export default function DeckPage() {
   const params = useParams();
-  const { currentDeck, selectedCard } = useDeckStore();
+  const deckId = params.id as string;
+  const { currentDeck, selectedCard, setCurrentDeck, setSelectedCard } = useDeckStore();
+  const { user } = useAuth();
+  const [loadedDeck, setLoadedDeck] = useState<Deck | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [fetchAttempted, setFetchAttempted] = useState(false);
+  const [showCheapest, setShowCheapest] = useState(false);
+  const [excludeBasicLands, setExcludeBasicLands] = useState(false);
+  const [cheapestValue, setCheapestValue] = useState<number | null>(null);
+  const [cheapestValueNoBasics, setCheapestValueNoBasics] = useState<number | null>(null);
+  const [isLoadingCheapest, setIsLoadingCheapest] = useState(false);
 
-  // For now, we just use the deck from the store
-  // In a full implementation, we'd fetch the deck by ID from the database
-  const deck = currentDeck;
+  // Use the store deck if its ID matches, otherwise use loaded deck
+  const deck = currentDeck?.id === deckId ? currentDeck : loadedDeck;
+
+  const fetchSavedDeck = useCallback(async () => {
+    if (!user || !deckId || fetchAttempted) return;
+
+    setIsLoading(true);
+    setFetchAttempted(true);
+
+    try {
+      const token = localStorage.getItem('decktutor-token');
+      const response = await fetch(`/api/user/decks/${deckId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const savedDeck = data.deck;
+
+        // Check if we have deckData (full deck stored as JSON)
+        if (savedDeck.deckData) {
+          // deckData contains the full deck structure with cards
+          const transformedDeck: Deck = {
+            id: savedDeck.id,
+            name: savedDeck.name,
+            description: savedDeck.description || undefined,
+            format: savedDeck.format || 'commander',
+            moxfieldId: savedDeck.moxfieldId || undefined,
+            moxfieldUrl: savedDeck.deckData.moxfieldUrl || (savedDeck.moxfieldId ? `https://www.moxfield.com/decks/${savedDeck.moxfieldId}` : undefined),
+            importedAt: savedDeck.createdAt,
+            lastModifiedAt: savedDeck.lastModifiedAt,
+            commanders: savedDeck.deckData.commanders || [],
+            mainboard: savedDeck.deckData.mainboard || [],
+            sideboard: savedDeck.deckData.sideboard || [],
+            maybeboard: savedDeck.deckData.maybeboard || [],
+          };
+
+          setLoadedDeck(transformedDeck);
+          setCurrentDeck(transformedDeck);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching saved deck:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, deckId, fetchAttempted, setCurrentDeck]);
 
   useEffect(() => {
-    // TODO: Fetch deck by ID if not in store
-    if (!deck && params.id) {
-      console.log('Would fetch deck:', params.id);
+    // If we don't have a matching deck in the store, try to fetch from API
+    if (!deck && user && !fetchAttempted) {
+      fetchSavedDeck();
     }
-  }, [deck, params.id]);
+  }, [deck, user, fetchAttempted, fetchSavedDeck]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 container mx-auto px-4 py-12">
+          <div className="text-center text-muted-foreground">Loading deck...</div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!deck) {
     return (
@@ -90,14 +159,6 @@ export default function DeckPage() {
   }
 
   const stats = calculateDeckStats(deck);
-  const { setSelectedCard } = useDeckStore();
-
-  const [showCheapest, setShowCheapest] = useState(false);
-  const [excludeBasicLands, setExcludeBasicLands] = useState(false);
-  const [cheapestValue, setCheapestValue] = useState<number | null>(null);
-  const [cheapestValueNoBasics, setCheapestValueNoBasics] = useState<number | null>(null);
-  const [isLoadingCheapest, setIsLoadingCheapest] = useState(false);
-
   const deckValue = calculateDeckValue(deck, excludeBasicLands);
 
   const fetchCheapestValue = async (excludeBasics: boolean) => {

@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { ChatContainer } from '@/components/chat';
+import { ChatContainer, AuthGate } from '@/components/chat';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeckStore } from '@/stores/deckStore';
@@ -148,10 +148,12 @@ export default function DeckChatPage() {
 
           {/* Chat container */}
           <div className="flex-1 flex flex-col min-h-0">
-            <ChatContainer
-              deckContext={deckContext}
-              deckId={deckId}
-            />
+            <AuthGate>
+              <ChatContainer
+                deckContext={deckContext}
+                deckId={deckId}
+              />
+            </AuthGate>
           </div>
         </div>
       </main>

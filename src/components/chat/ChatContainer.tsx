@@ -64,10 +64,14 @@ export function ChatContainer({ deckContext, deckId }: ChatContainerProps) {
           settings,
         };
 
-        // Call API
+        // Call API with auth token
+        const token = typeof window !== 'undefined' ? localStorage.getItem('decktutor-token') : null;
         const response = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify(request),
         });
 

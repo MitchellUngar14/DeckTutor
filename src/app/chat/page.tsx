@@ -2,7 +2,7 @@
 
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { ChatContainer } from '@/components/chat';
+import { ChatContainer, AuthGate } from '@/components/chat';
 
 export default function ChatPage() {
   return (
@@ -19,7 +19,9 @@ export default function ChatPage() {
           </div>
 
           <div className="flex-1 flex flex-col min-h-0">
-            <ChatContainer />
+            <AuthGate>
+              <ChatContainer />
+            </AuthGate>
           </div>
         </div>
       </main>
