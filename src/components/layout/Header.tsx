@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ export function Header() {
       <div className="container mx-auto px-4 flex h-14 items-center">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
+            <Image src="/icon.svg" alt="DeckTutor" width={36} height={36} />
             <span className="text-xl font-bold">DeckTutor</span>
           </Link>
         </div>
