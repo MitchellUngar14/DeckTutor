@@ -6,48 +6,43 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { DeckList } from '@/components/deck/DeckList';
+import { AddCardSearch } from '@/components/deck/AddCardSearch';
 import { DeckStatsSummary, ManaCurve } from '@/components/deck/DeckStats';
 import { CardPreview } from '@/components/card/CardPreview';
 import { CardImage } from '@/components/card/CardImage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, RefreshCw } from 'lucide-react';
+import { X, RefreshCw, Pencil, Check } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useDeckStore } from '@/stores/deckStore';
 import { useAuth } from '@/context/AuthContext';
 import { calculateDeckStats, type Deck, type Card as CardType, type DeckCard } from '@/types';
 
-const BASIC_LAND_NAMES = [
-  'Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Wastes',
-  'Snow-Covered Plains', 'Snow-Covered Island', 'Snow-Covered Swamp',
-  'Snow-Covered Mountain', 'Snow-Covered Forest',
-];
-
-function isBasicLand(card: CardType): boolean {
-  return BASIC_LAND_NAMES.includes(card.name) ||
-         card.typeLine.toLowerCase().includes('basic land');
+function isLand(card: CardType): boolean {
+  return card.typeLine.toLowerCase().includes('land');
 }
 
-function calculateDeckValue(deck: Deck, excludeBasicLands: boolean = false): number {
+function calculateDeckValue(deck: Deck, excludeLands: boolean = false): number {
   let total = 0;
 
   // Commanders
   for (const commander of deck.commanders) {
-    if (excludeBasicLands && isBasicLand(commander)) continue;
+    if (excludeLands && isLand(commander)) continue;
     const price = parseFloat(commander.prices?.usd || '0');
     if (!isNaN(price)) total += price;
   }
 
   // Mainboard
   for (const dc of deck.mainboard) {
-    if (excludeBasicLands && isBasicLand(dc.card)) continue;
+    if (excludeLands && isLand(dc.card)) continue;
     const price = parseFloat(dc.card.prices?.usd || '0');
     if (!isNaN(price)) total += price * dc.quantity;
   }
 
   // Sideboard
   for (const dc of deck.sideboard) {
-    if (excludeBasicLands && isBasicLand(dc.card)) continue;
+    if (excludeLands && isLand(dc.card)) continue;
     const price = parseFloat(dc.card.prices?.usd || '0');
     if (!isNaN(price)) total += price * dc.quantity;
   }
@@ -58,16 +53,25 @@ function calculateDeckValue(deck: Deck, excludeBasicLands: boolean = false): num
 export default function DeckPage() {
   const params = useParams();
   const deckId = params.id as string;
-  const { currentDeck, selectedCard, setCurrentDeck, setSelectedCard } = useDeckStore();
+  const {
+    currentDeck,
+    selectedCard,
+    setCurrentDeck,
+    setSelectedCard,
+    setSavedDeckSnapshot,
+    setSavedDeckId,
+  } = useDeckStore();
   const { user } = useAuth();
   const [loadedDeck, setLoadedDeck] = useState<Deck | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchAttempted, setFetchAttempted] = useState(false);
   const [showCheapest, setShowCheapest] = useState(false);
-  const [excludeBasicLands, setExcludeBasicLands] = useState(false);
+  const [excludeLands, setExcludeLands] = useState(false);
   const [cheapestValue, setCheapestValue] = useState<number | null>(null);
-  const [cheapestValueNoBasics, setCheapestValueNoBasics] = useState<number | null>(null);
+  const [cheapestValueNoLands, setCheapestValueNoLands] = useState<number | null>(null);
   const [isLoadingCheapest, setIsLoadingCheapest] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
 
   // Use the store deck if its ID matches, otherwise use loaded deck
   const deck = currentDeck?.id === deckId ? currentDeck : loadedDeck;
@@ -110,6 +114,9 @@ export default function DeckPage() {
 
           setLoadedDeck(transformedDeck);
           setCurrentDeck(transformedDeck);
+          // Set the saved state for change tracking
+          setSavedDeckSnapshot(JSON.parse(JSON.stringify(transformedDeck)));
+          setSavedDeckId(savedDeck.id);
         }
       }
     } catch (error) {
@@ -117,7 +124,7 @@ export default function DeckPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, deckId, fetchAttempted, setCurrentDeck]);
+  }, [user, deckId, fetchAttempted, setCurrentDeck, setSavedDeckSnapshot, setSavedDeckId]);
 
   useEffect(() => {
     // If we don't have a matching deck in the store, try to fetch from API
@@ -159,10 +166,10 @@ export default function DeckPage() {
   }
 
   const stats = calculateDeckStats(deck);
-  const deckValue = calculateDeckValue(deck, excludeBasicLands);
+  const deckValue = calculateDeckValue(deck, excludeLands);
 
-  const fetchCheapestValue = async (excludeBasics: boolean) => {
-    const cacheKey = excludeBasics ? cheapestValueNoBasics : cheapestValue;
+  const fetchCheapestValue = async (excludeLandsParam: boolean) => {
+    const cacheKey = excludeLandsParam ? cheapestValueNoLands : cheapestValue;
     if (cacheKey !== null) return; // Already fetched
 
     setIsLoadingCheapest(true);
@@ -173,9 +180,9 @@ export default function DeckPage() {
         ...deck.sideboard.map((dc) => ({ card: dc.card, quantity: dc.quantity })),
       ];
 
-      // Filter out basic lands if requested
-      const filteredCards = excludeBasics
-        ? allCards.filter(({ card }) => !isBasicLand(card))
+      // Filter out lands if requested
+      const filteredCards = excludeLandsParam
+        ? allCards.filter(({ card }) => !isLand(card))
         : allCards;
 
       const cards = filteredCards.map(({ card, quantity }) => ({
@@ -193,8 +200,8 @@ export default function DeckPage() {
 
       if (response.ok) {
         const data = await response.json();
-        if (excludeBasics) {
-          setCheapestValueNoBasics(data.cheapestValue);
+        if (excludeLandsParam) {
+          setCheapestValueNoLands(data.cheapestValue);
         } else {
           setCheapestValue(data.cheapestValue);
         }
@@ -209,26 +216,56 @@ export default function DeckPage() {
   const handleToggleCheapest = (checked: boolean) => {
     setShowCheapest(checked);
     if (checked) {
-      const cached = excludeBasicLands ? cheapestValueNoBasics : cheapestValue;
+      const cached = excludeLands ? cheapestValueNoLands : cheapestValue;
       if (cached === null) {
-        fetchCheapestValue(excludeBasicLands);
+        fetchCheapestValue(excludeLands);
       }
     }
   };
 
-  const handleToggleExcludeBasics = () => {
-    const newValue = !excludeBasicLands;
-    setExcludeBasicLands(newValue);
+  const handleToggleExcludeLands = () => {
+    const newValue = !excludeLands;
+    setExcludeLands(newValue);
     // If showing cheapest, fetch the new value if not cached
     if (showCheapest) {
-      const cached = newValue ? cheapestValueNoBasics : cheapestValue;
+      const cached = newValue ? cheapestValueNoLands : cheapestValue;
       if (cached === null) {
         fetchCheapestValue(newValue);
       }
     }
   };
 
-  const currentCheapestValue = excludeBasicLands ? cheapestValueNoBasics : cheapestValue;
+  const currentCheapestValue = excludeLands ? cheapestValueNoLands : cheapestValue;
+
+  const handleStartEditName = () => {
+    setEditedName(deck.name);
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = () => {
+    const trimmedName = editedName.trim();
+    if (trimmedName && trimmedName !== deck.name) {
+      setCurrentDeck({
+        ...deck,
+        name: trimmedName,
+        lastModifiedAt: new Date().toISOString(),
+      });
+    }
+    setIsEditingName(false);
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditingName(false);
+    setEditedName('');
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveName();
+    } else if (e.key === 'Escape') {
+      handleCancelEditName();
+    }
+  };
 
   // Don't include commanders in allCards - they're shown separately
   const allCards = [...deck.mainboard];
@@ -240,7 +277,40 @@ export default function DeckPage() {
       <main className="flex-1 container mx-auto px-4 py-6 lg:pr-[380px]">
         {/* Deck Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">{deck.name}</h1>
+          <div className="flex items-center gap-2">
+            {isEditingName ? (
+              <div className="flex items-center gap-2 flex-1 max-w-md">
+                <Input
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  onKeyDown={handleNameKeyDown}
+                  onBlur={handleSaveName}
+                  className="text-2xl font-bold h-auto py-1"
+                  autoFocus
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSaveName}
+                  className="h-8 w-8"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold">{deck.name}</h1>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleStartEditName}
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             {deck.format.charAt(0).toUpperCase() + deck.format.slice(1)}
             {deck.commanders.length > 0 &&
@@ -269,12 +339,12 @@ export default function DeckPage() {
             </span>
             <span className="text-sm text-muted-foreground">
               {showCheapest ? 'cheapest printings' : 'current printings'}
-              {excludeBasicLands && ' (excl. basics)'}
+              {excludeLands && ' (excl. lands)'}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant={showCheapest ? 'default' : 'outline'}
               size="sm"
               onClick={() => handleToggleCheapest(!showCheapest)}
               disabled={isLoadingCheapest}
@@ -282,12 +352,12 @@ export default function DeckPage() {
               {showCheapest ? 'Show current' : 'Show cheapest'}
             </Button>
             <Button
-              variant={excludeBasicLands ? 'default' : 'outline'}
+              variant={excludeLands ? 'default' : 'outline'}
               size="sm"
-              onClick={handleToggleExcludeBasics}
+              onClick={handleToggleExcludeLands}
               disabled={isLoadingCheapest}
             >
-              {excludeBasicLands ? 'Include basics' : 'Exclude basics'}
+              {excludeLands ? 'Include lands' : 'Exclude lands'}
             </Button>
           </div>
           {showCheapest && currentCheapestValue !== null && deckValue > currentCheapestValue && (
@@ -295,6 +365,12 @@ export default function DeckPage() {
               (save ${(deckValue - currentCheapestValue).toFixed(2)})
             </span>
           )}
+        </div>
+
+        {/* Add Card Search */}
+        <div className="mb-6">
+          <h2 className="text-sm font-medium text-muted-foreground mb-2">Add Cards</h2>
+          <AddCardSearch className="max-w-md" />
         </div>
 
         {/* Commander & Stats Section */}

@@ -24,6 +24,11 @@ function sortCards(cards: DeckCardType[], sortBy: SortBy): DeckCardType[] {
         return a.card.typeLine.localeCompare(b.card.typeLine);
       case 'color':
         return a.card.colorIdentity.join('').localeCompare(b.card.colorIdentity.join(''));
+      case 'cost': {
+        const priceA = parseFloat(a.card.prices?.usd || '0') || 0;
+        const priceB = parseFloat(b.card.prices?.usd || '0') || 0;
+        return priceB - priceA; // Sort descending (most expensive first)
+      }
       default:
         return 0;
     }

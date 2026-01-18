@@ -23,6 +23,8 @@ import {
 import { useDeckStore, type ViewMode, type SortBy, type GroupBy } from '@/stores/deckStore';
 import { useAuth } from '@/context/AuthContext';
 import { SaveDeckButton } from '@/components/deck/SaveDeckButton';
+import { DeckChangesDialog } from '@/components/deck/DeckChangesDialog';
+import { useSaveDeck } from '@/hooks/useSaveDeck';
 
 export function Header() {
   const pathname = usePathname();
@@ -32,6 +34,19 @@ export function Header() {
   const [showSettings, setShowSettings] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Use the save deck hook for mobile save functionality
+  const {
+    saving: mobileSaving,
+    showChangesDialog,
+    changes,
+    hasChanges,
+    handleSaveClick: handleMobileSaveClick,
+    performSave,
+    undoChanges,
+    setShowChangesDialog,
+    getButtonText,
+  } = useSaveDeck();
 
   useEffect(() => {
     setMounted(true);
@@ -44,12 +59,17 @@ export function Header() {
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
 
+  const handleMobileSave = async () => {
+    setMobileMenuOpen(false);
+    await handleMobileSaveClick();
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 flex h-14 items-center">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Image src="/icon.svg" alt="DeckTutor" width={36} height={36} />
+            <Image src="/logo.png" alt="DeckTutor" width={36} height={36} />
             <span className="text-xl font-bold">DeckTutor</span>
           </Link>
         </div>
@@ -60,7 +80,7 @@ export function Header() {
             <>
               {user && <SaveDeckButton />}
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/deck/${currentDeck.id}/chat`}>Chat</Link>
+                <Link href={`/deck/${currentDeck.id}/chat`}>Ask AI</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/deck/${currentDeck.id}/combos`}>Check Combos</Link>
@@ -99,7 +119,7 @@ export function Header() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Sort By</label>
                       <div className="flex flex-wrap gap-2">
-                        {(['name', 'cmc', 'type', 'color'] as SortBy[]).map((sort) => (
+                        {(['name', 'cmc', 'type', 'color', 'cost'] as SortBy[]).map((sort) => (
                           <Button
                             key={sort}
                             variant={sortBy === sort ? 'default' : 'outline'}
@@ -131,9 +151,6 @@ export function Header() {
               </Sheet>
             </>
           )}
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/chat">AI Chat</Link>
-          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/deck/import">Import Deck</Link>
           </Button>
@@ -239,11 +256,6 @@ export function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
-                <Link href="/chat" onClick={() => setMobileMenuOpen(false)}>
-                  AI Chat
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
                 <Link href="/deck/import" onClick={() => setMobileMenuOpen(false)}>
                   Import Deck
                 </Link>
@@ -284,9 +296,14 @@ export function Header() {
               {showDeckActions && (
                 <>
                   <DropdownMenuSeparator />
+                  {user && (
+                    <DropdownMenuItem onClick={handleMobileSave} disabled={mobileSaving}>
+                      {getButtonText()}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link href={`/deck/${currentDeck.id}/chat`} onClick={() => setMobileMenuOpen(false)}>
-                      Chat about Deck
+                      Ask AI
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -340,7 +357,7 @@ export function Header() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Sort By</label>
                     <div className="flex flex-wrap gap-2">
-                      {(['name', 'cmc', 'type', 'color'] as SortBy[]).map((sort) => (
+                      {(['name', 'cmc', 'type', 'color', 'cost'] as SortBy[]).map((sort) => (
                         <Button
                           key={sort}
                           variant={sortBy === sort ? 'default' : 'outline'}
@@ -371,6 +388,16 @@ export function Header() {
               </SheetContent>
             </Sheet>
           )}
+
+          {/* Deck Changes Dialog for mobile save confirmation */}
+          <DeckChangesDialog
+            open={showChangesDialog}
+            onOpenChange={setShowChangesDialog}
+            changes={changes}
+            onConfirm={performSave}
+            onUndo={undoChanges}
+            isLoading={mobileSaving}
+          />
         </div>
       </div>
     </header>

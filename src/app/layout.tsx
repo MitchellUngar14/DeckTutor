@@ -19,7 +19,8 @@ export const metadata: Metadata = {
     'Import your MTG decks from Moxfield and discover powerful combos and synergies using EDHREC data.',
   keywords: ['MTG', 'Magic: The Gathering', 'Commander', 'EDH', 'Deck Builder', 'Combos', 'EDHREC'],
   icons: {
-    icon: { url: '/icon.svg', sizes: '32x32', type: 'image/svg+xml' },
+    icon: '/icon.png',
+    apple: '/logo.png',
   },
 };
 

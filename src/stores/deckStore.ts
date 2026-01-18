@@ -3,12 +3,18 @@ import { persist } from 'zustand/middleware';
 import type { Card, Deck, DeckCard } from '@/types';
 
 export type ViewMode = 'grid' | 'list' | 'visual';
-export type SortBy = 'name' | 'cmc' | 'type' | 'color';
+export type SortBy = 'name' | 'cmc' | 'type' | 'color' | 'cost';
 export type GroupBy = 'type' | 'cmc' | 'color' | 'none';
 
 interface DeckState {
   // Current working deck
   currentDeck: Deck | null;
+
+  // Snapshot of the deck when it was last saved (for tracking changes)
+  savedDeckSnapshot: Deck | null;
+
+  // Database ID of the saved deck (if it exists in DB)
+  savedDeckId: string | null;
 
   // UI state
   viewMode: ViewMode;
@@ -26,6 +32,9 @@ interface DeckState {
 
   // Actions
   setCurrentDeck: (deck: Deck | null) => void;
+  setSavedDeckSnapshot: (deck: Deck | null) => void;
+  setSavedDeckId: (id: string | null) => void;
+  markDeckAsSaved: () => void;
   updateCardQuantity: (cardId: string, board: DeckCard['board'], quantity: number) => void;
   removeCard: (cardId: string, board: DeckCard['board']) => void;
   addCard: (card: Card, board: DeckCard['board']) => void;
@@ -42,6 +51,8 @@ export const useDeckStore = create<DeckState>()(
   persist(
     (set, get) => ({
       currentDeck: null,
+      savedDeckSnapshot: null,
+      savedDeckId: null,
       viewMode: 'grid',
       sortBy: 'name',
       groupBy: 'type',
@@ -52,6 +63,18 @@ export const useDeckStore = create<DeckState>()(
       importStage: 'idle',
 
       setCurrentDeck: (deck) => set({ currentDeck: deck }),
+
+      setSavedDeckSnapshot: (deck) => set({ savedDeckSnapshot: deck }),
+
+      setSavedDeckId: (id) => set({ savedDeckId: id }),
+
+      markDeckAsSaved: () => {
+        const { currentDeck } = get();
+        if (currentDeck) {
+          // Deep clone the current deck as the new saved snapshot
+          set({ savedDeckSnapshot: JSON.parse(JSON.stringify(currentDeck)) });
+        }
+      },
 
       updateCardQuantity: (cardId, board, quantity) => {
         const { currentDeck } = get();
@@ -132,6 +155,8 @@ export const useDeckStore = create<DeckState>()(
       clearDeck: () =>
         set({
           currentDeck: null,
+          savedDeckSnapshot: null,
+          savedDeckId: null,
           hoveredCard: null,
           selectedCard: null,
           importStage: 'idle',

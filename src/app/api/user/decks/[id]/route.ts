@@ -46,6 +46,68 @@ export async function GET(
   }
 }
 
+// PUT /api/user/decks/[id] - Update a saved deck
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const authHeader = request.headers.get('authorization');
+    const token = extractBearerToken(authHeader);
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // Verify the deck belongs to the user
+    const [existingDeck] = await db
+      .select({ id: userDecks.id })
+      .from(userDecks)
+      .where(and(eq(userDecks.id, id), eq(userDecks.userId, payload.userId)))
+      .limit(1);
+
+    if (!existingDeck) {
+      return NextResponse.json({ error: 'Deck not found' }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const { name, description, format, commanderIds, deckData } = body;
+
+    // Update the deck
+    const [updatedDeck] = await db
+      .update(userDecks)
+      .set({
+        name,
+        description,
+        format,
+        commanderIds,
+        moxfieldData: deckData,
+        lastModifiedAt: new Date(),
+      })
+      .where(eq(userDecks.id, id))
+      .returning();
+
+    return NextResponse.json({
+      deck: {
+        id: updatedDeck.id,
+        name: updatedDeck.name,
+        description: updatedDeck.description,
+        format: updatedDeck.format,
+        lastModifiedAt: updatedDeck.lastModifiedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating deck:', error);
+    return NextResponse.json({ error: 'Failed to update deck' }, { status: 500 });
+  }
+}
+
 // DELETE /api/user/decks/[id] - Delete a saved deck
 export async function DELETE(
   request: NextRequest,

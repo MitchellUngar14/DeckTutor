@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { CardImage } from '@/components/card/CardImage';
 import { Button } from '@/components/ui/button';
 import { ManaText } from '@/components/ui/mana-symbol';
@@ -14,9 +15,46 @@ interface DeckCardProps {
 
 export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
   const { card, quantity, board } = deckCard;
-  const { selectedCard, setSelectedCard, updateCardQuantity, removeCard } = useDeckStore();
+  const { selectedCard, setSelectedCard, updateCardQuantity, removeCard, savedDeckSnapshot } = useDeckStore();
+
+  // Check if this card is a pending addition (not in saved snapshot)
+  const isPendingAddition = useMemo(() => {
+    if (!savedDeckSnapshot) return false; // New deck, nothing to compare
+
+    // Check if this card exists in the saved snapshot
+    const checkBoard = (boardCards: typeof savedDeckSnapshot.mainboard) => {
+      return boardCards.some(dc => dc.card.id === card.id);
+    };
+
+    // Check commanders
+    if (savedDeckSnapshot.commanders.some(c => c.id === card.id)) {
+      return false; // Card exists in saved snapshot
+    }
+
+    // Check the appropriate board
+    if (board === 'mainboard' && checkBoard(savedDeckSnapshot.mainboard)) return false;
+    if (board === 'sideboard' && checkBoard(savedDeckSnapshot.sideboard)) return false;
+    if (board === 'maybeboard' && checkBoard(savedDeckSnapshot.maybeboard)) return false;
+
+    // Card not found in saved snapshot - it's a pending addition
+    return true;
+  }, [savedDeckSnapshot, card.id, board]);
 
   const isSelected = selectedCard?.id === card.id;
+
+  const handleIncrement = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateCardQuantity(card.id, board, quantity + 1);
+  };
+
+  const handleDecrement = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (quantity > 1) {
+      updateCardQuantity(card.id, board, quantity - 1);
+    } else {
+      removeCard(card.id, board);
+    }
+  };
 
   if (viewMode === 'grid') {
     return (
@@ -33,6 +71,32 @@ export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
             x{quantity}
           </div>
         )}
+        {/* Pending addition indicator */}
+        {isPendingAddition && (
+          <div
+            className="absolute top-1 left-1 h-3 w-3 rounded-full bg-amber-500 border border-amber-600 shadow-sm"
+            title="Unsaved addition"
+          />
+        )}
+        {/* Hover controls */}
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-6 w-6 p-0 text-xs shadow-md"
+            onClick={handleIncrement}
+          >
+            +
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-6 w-6 p-0 text-xs shadow-md"
+            onClick={handleDecrement}
+          >
+            -
+          </Button>
+        </div>
       </div>
     );
   }
@@ -52,6 +116,32 @@ export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
             x{quantity}
           </div>
         )}
+        {/* Pending addition indicator */}
+        {isPendingAddition && (
+          <div
+            className="absolute top-2 left-2 h-4 w-4 rounded-full bg-amber-500 border-2 border-amber-600 shadow"
+            title="Unsaved addition"
+          />
+        )}
+        {/* Hover controls */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 w-8 p-0 text-sm shadow-md"
+            onClick={handleIncrement}
+          >
+            +
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 w-8 p-0 text-sm shadow-md"
+            onClick={handleDecrement}
+          >
+            -
+          </Button>
+        </div>
       </div>
     );
   }
@@ -66,6 +156,16 @@ export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
       )}
       onClick={() => setSelectedCard(isSelected ? null : card)}
     >
+      {/* Pending addition indicator */}
+      {isPendingAddition ? (
+        <div
+          className="h-2.5 w-2.5 rounded-full bg-amber-500 flex-shrink-0"
+          title="Unsaved addition"
+        />
+      ) : (
+        <div className="w-2.5 flex-shrink-0" />
+      )}
+
       <span className="w-6 text-center font-mono text-sm text-muted-foreground">
         {quantity}x
       </span>
@@ -86,7 +186,7 @@ export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
           variant="ghost"
           size="sm"
           className="h-7 w-7 p-0"
-          onClick={() => updateCardQuantity(card.id, board, quantity + 1)}
+          onClick={handleIncrement}
         >
           +
         </Button>
@@ -94,13 +194,7 @@ export function DeckCard({ deckCard, viewMode }: DeckCardProps) {
           variant="ghost"
           size="sm"
           className="h-7 w-7 p-0"
-          onClick={() => {
-            if (quantity > 1) {
-              updateCardQuantity(card.id, board, quantity - 1);
-            } else {
-              removeCard(card.id, board);
-            }
-          }}
+          onClick={handleDecrement}
         >
           -
         </Button>
