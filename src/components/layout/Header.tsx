@@ -154,6 +154,12 @@ export function Header() {
           <Button variant="outline" size="sm" asChild>
             <Link href="/deck/import">Import Deck</Link>
           </Button>
+          <Button variant="outline" size="sm" asChild className="gap-2">
+            <a href="https://manaroom.vercel.app" target="_blank" rel="noopener noreferrer">
+              <Image src="/manaroom-icon.png" alt="ManaRoom" width={18} height={18} className="rounded-sm" />
+              ManaRoom
+            </a>
+          </Button>
           {/* Auth UI */}
           {mounted && !authLoading && (
             user ? (
@@ -259,6 +265,18 @@ export function Header() {
                 <Link href="/deck/import" onClick={() => setMobileMenuOpen(false)}>
                   Import Deck
                 </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a
+                  href="https://manaroom.vercel.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2"
+                >
+                  <Image src="/manaroom-icon.png" alt="ManaRoom" width={16} height={16} className="rounded-sm" />
+                  ManaRoom
+                </a>
               </DropdownMenuItem>
               {mounted && (
                 <DropdownMenuItem onClick={() => { setMobileMenuOpen(false); toggleTheme(); }}>

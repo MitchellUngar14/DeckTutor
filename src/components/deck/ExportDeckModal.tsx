@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Check, Download } from 'lucide-react';
+import Image from 'next/image';
+import { Copy, Check, Download, ExternalLink } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import type { Deck } from '@/types';
 
 interface ExportDeckModalProps {
@@ -56,6 +58,32 @@ function generateDeckList(deck: Deck): string {
   return lines.join('\n');
 }
 
+// Generate ManaRoom-compatible format with section headers
+function generateManaRoomFormat(deck: Deck): string {
+  const lines: string[] = [];
+
+  // Add commanders first with section header
+  if (deck.commanders.length > 0) {
+    lines.push('// Commander');
+    for (const commander of deck.commanders) {
+      lines.push(`1 ${commander.name}`);
+    }
+    lines.push('');
+  }
+
+  // Add mainboard cards
+  lines.push('// Mainboard');
+  const mainboardCards = deck.mainboard
+    .map((dc) => ({ name: dc.card.name, quantity: dc.quantity }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const card of mainboardCards) {
+    lines.push(`${card.quantity} ${card.name}`);
+  }
+
+  return lines.join('\n');
+}
+
 export function ExportDeckModal({ open, onOpenChange, deck }: ExportDeckModalProps) {
   const [copied, setCopied] = useState(false);
 
@@ -83,6 +111,18 @@ export function ExportDeckModal({ open, onOpenChange, deck }: ExportDeckModalPro
     URL.revokeObjectURL(url);
   };
 
+  const handleExportToManaRoom = async () => {
+    try {
+      const manaRoomFormat = generateManaRoomFormat(deck);
+      await navigator.clipboard.writeText(manaRoomFormat);
+      toast.success('Deck copied! Paste it in ManaRoom to import.');
+      window.open('https://manaroom.vercel.app', '_blank');
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      toast.error('Failed to copy deck');
+    }
+  };
+
   const totalCards =
     deck.commanders.length +
     deck.mainboard.reduce((sum, dc) => sum + dc.quantity, 0) +
@@ -102,24 +142,31 @@ export function ExportDeckModal({ open, onOpenChange, deck }: ExportDeckModalPro
           <pre className="text-sm font-mono whitespace-pre-wrap p-4">{deckList}</pre>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Download
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={handleExportToManaRoom} className="w-full sm:w-auto gap-2">
+            <Image src="/manaroom-icon.png" alt="ManaRoom" width={16} height={16} className="rounded-sm" />
+            Play on ManaRoom
+            <ExternalLink className="h-3 w-3" />
           </Button>
-          <Button onClick={handleCopy}>
-            {copied ? (
-              <>
-                <Check className="mr-2 h-4 w-4" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="mr-2 h-4 w-4" />
-                Copy to Clipboard
-              </>
-            )}
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={handleDownload} className="flex-1 sm:flex-none">
+              <Download className="mr-2 h-4 w-4" />
+              Download
+            </Button>
+            <Button onClick={handleCopy} className="flex-1 sm:flex-none">
+              {copied ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
