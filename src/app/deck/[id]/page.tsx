@@ -149,6 +149,7 @@ export default function DeckPage() {
           };
 
           setLoadedDeck(transformedDeck);
+          setCurrentDeck(transformedDeck);
           setIsReadOnly(true);
         }
       }
