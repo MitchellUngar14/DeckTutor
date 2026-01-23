@@ -62,7 +62,7 @@ export default function DeckPage() {
     setSavedDeckSnapshot,
     setSavedDeckId,
   } = useDeckStore();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [loadedDeck, setLoadedDeck] = useState<Deck | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchAttempted, setFetchAttempted] = useState(false);
@@ -161,13 +161,17 @@ export default function DeckPage() {
   }, [user, deckId, fetchAttempted, setCurrentDeck, setSavedDeckSnapshot, setSavedDeckId]);
 
   useEffect(() => {
+    // Wait for auth to finish loading before fetching
+    // This ensures we know if user is logged in before deciding which endpoint to use
+    if (authLoading) return;
+
     // If we don't have a matching deck in the store, try to fetch from API
     if (!deck && !fetchAttempted) {
       fetchDeck();
     }
-  }, [deck, fetchAttempted, fetchDeck]);
+  }, [deck, fetchAttempted, fetchDeck, authLoading]);
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
