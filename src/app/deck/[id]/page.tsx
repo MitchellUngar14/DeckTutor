@@ -10,10 +10,11 @@ import { AddCardSearch } from '@/components/deck/AddCardSearch';
 import { DeckStatsSummary, ManaCurve } from '@/components/deck/DeckStats';
 import { CardPreview } from '@/components/card/CardPreview';
 import { CardImage } from '@/components/card/CardImage';
+import { ExportDeckModal } from '@/components/deck/ExportDeckModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, RefreshCw, Pencil, Check } from 'lucide-react';
+import { X, RefreshCw, Pencil, Check, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDeckStore } from '@/stores/deckStore';
 import { useAuth } from '@/context/AuthContext';
@@ -72,55 +73,87 @@ export default function DeckPage() {
   const [isLoadingCheapest, setIsLoadingCheapest] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   // Use the store deck if its ID matches, otherwise use loaded deck
   const deck = currentDeck?.id === deckId ? currentDeck : loadedDeck;
 
-  const fetchSavedDeck = useCallback(async () => {
-    if (!user || !deckId || fetchAttempted) return;
+  const fetchDeck = useCallback(async () => {
+    if (!deckId || fetchAttempted) return;
 
     setIsLoading(true);
     setFetchAttempted(true);
 
     try {
-      const token = localStorage.getItem('decktutor-token');
-      const response = await fetch(`/api/user/decks/${deckId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // If user is logged in, try to fetch as owner first
+      if (user) {
+        const token = localStorage.getItem('decktutor-token');
+        const response = await fetch(`/api/user/decks/${deckId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        const savedDeck = data.deck;
+        if (response.ok) {
+          const data = await response.json();
+          const savedDeck = data.deck;
 
-        // Check if we have deckData (full deck stored as JSON)
-        if (savedDeck.deckData) {
-          // deckData contains the full deck structure with cards
+          if (savedDeck.deckData) {
+            const transformedDeck: Deck = {
+              id: savedDeck.id,
+              name: savedDeck.name,
+              description: savedDeck.description || undefined,
+              format: savedDeck.format || 'commander',
+              moxfieldId: savedDeck.moxfieldId || undefined,
+              moxfieldUrl: savedDeck.deckData.moxfieldUrl || (savedDeck.moxfieldId ? `https://www.moxfield.com/decks/${savedDeck.moxfieldId}` : undefined),
+              importedAt: savedDeck.createdAt,
+              lastModifiedAt: savedDeck.lastModifiedAt,
+              commanders: savedDeck.deckData.commanders || [],
+              mainboard: savedDeck.deckData.mainboard || [],
+              sideboard: savedDeck.deckData.sideboard || [],
+              maybeboard: savedDeck.deckData.maybeboard || [],
+            };
+
+            setLoadedDeck(transformedDeck);
+            setCurrentDeck(transformedDeck);
+            setSavedDeckSnapshot(JSON.parse(JSON.stringify(transformedDeck)));
+            setSavedDeckId(savedDeck.id);
+            setIsReadOnly(false);
+            return;
+          }
+        }
+      }
+
+      // Fall back to public endpoint (for guests or if user doesn't own the deck)
+      const publicResponse = await fetch(`/api/decks/${deckId}`);
+
+      if (publicResponse.ok) {
+        const data = await publicResponse.json();
+        const sharedDeck = data.deck;
+
+        if (sharedDeck.deckData) {
           const transformedDeck: Deck = {
-            id: savedDeck.id,
-            name: savedDeck.name,
-            description: savedDeck.description || undefined,
-            format: savedDeck.format || 'commander',
-            moxfieldId: savedDeck.moxfieldId || undefined,
-            moxfieldUrl: savedDeck.deckData.moxfieldUrl || (savedDeck.moxfieldId ? `https://www.moxfield.com/decks/${savedDeck.moxfieldId}` : undefined),
-            importedAt: savedDeck.createdAt,
-            lastModifiedAt: savedDeck.lastModifiedAt,
-            commanders: savedDeck.deckData.commanders || [],
-            mainboard: savedDeck.deckData.mainboard || [],
-            sideboard: savedDeck.deckData.sideboard || [],
-            maybeboard: savedDeck.deckData.maybeboard || [],
+            id: sharedDeck.id,
+            name: sharedDeck.name,
+            description: sharedDeck.description || undefined,
+            format: sharedDeck.format || 'commander',
+            moxfieldId: sharedDeck.moxfieldId || undefined,
+            moxfieldUrl: sharedDeck.deckData.moxfieldUrl || (sharedDeck.moxfieldId ? `https://www.moxfield.com/decks/${sharedDeck.moxfieldId}` : undefined),
+            importedAt: sharedDeck.createdAt,
+            lastModifiedAt: sharedDeck.lastModifiedAt,
+            commanders: sharedDeck.deckData.commanders || [],
+            mainboard: sharedDeck.deckData.mainboard || [],
+            sideboard: sharedDeck.deckData.sideboard || [],
+            maybeboard: sharedDeck.deckData.maybeboard || [],
           };
 
           setLoadedDeck(transformedDeck);
-          setCurrentDeck(transformedDeck);
-          // Set the saved state for change tracking
-          setSavedDeckSnapshot(JSON.parse(JSON.stringify(transformedDeck)));
-          setSavedDeckId(savedDeck.id);
+          setIsReadOnly(true);
         }
       }
     } catch (error) {
-      console.error('Error fetching saved deck:', error);
+      console.error('Error fetching deck:', error);
     } finally {
       setIsLoading(false);
     }
@@ -128,10 +161,10 @@ export default function DeckPage() {
 
   useEffect(() => {
     // If we don't have a matching deck in the store, try to fetch from API
-    if (!deck && user && !fetchAttempted) {
-      fetchSavedDeck();
+    if (!deck && !fetchAttempted) {
+      fetchDeck();
     }
-  }, [deck, user, fetchAttempted, fetchSavedDeck]);
+  }, [deck, fetchAttempted, fetchDeck]);
 
   if (isLoading) {
     return (
@@ -275,10 +308,25 @@ export default function DeckPage() {
       <Header />
 
       <main className="flex-1 container mx-auto px-4 py-6 lg:pr-[380px]">
+        {/* Shared Deck Banner */}
+        {isReadOnly && (
+          <div className="mb-4 rounded-lg border bg-muted/50 px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              You&apos;re viewing a shared deck.{' '}
+              {!user && (
+                <Link href="/auth/signin" className="text-primary hover:underline">
+                  Sign in
+                </Link>
+              )}{' '}
+              {!user && 'to save and edit your own decks.'}
+            </p>
+          </div>
+        )}
+
         {/* Deck Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2">
-            {isEditingName ? (
+            {isEditingName && !isReadOnly ? (
               <div className="flex items-center gap-2 flex-1 max-w-md">
                 <Input
                   value={editedName}
@@ -300,13 +348,24 @@ export default function DeckPage() {
             ) : (
               <>
                 <h1 className="text-2xl font-bold">{deck.name}</h1>
+                {!isReadOnly && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleStartEditName}
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleStartEditName}
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowExportModal(true)}
+                  className="ml-2"
                 >
-                  <Pencil className="h-4 w-4" />
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
                 </Button>
               </>
             )}
@@ -367,11 +426,13 @@ export default function DeckPage() {
           )}
         </div>
 
-        {/* Add Card Search */}
-        <div className="mb-6">
-          <h2 className="text-sm font-medium text-muted-foreground mb-2">Add Cards</h2>
-          <AddCardSearch className="max-w-md" />
-        </div>
+        {/* Add Card Search - only for owners */}
+        {!isReadOnly && (
+          <div className="mb-6">
+            <h2 className="text-sm font-medium text-muted-foreground mb-2">Add Cards</h2>
+            <AddCardSearch className="max-w-md" />
+          </div>
+        )}
 
         {/* Commander & Stats Section */}
         <div className="mb-6 flex flex-col lg:flex-row gap-6">
@@ -476,6 +537,13 @@ export default function DeckPage() {
           <CardPreview card={selectedCard} />
         </div>
       </div>
+
+      {/* Export Deck Modal */}
+      <ExportDeckModal
+        open={showExportModal}
+        onOpenChange={setShowExportModal}
+        deck={deck}
+      />
 
       <Footer />
     </div>
